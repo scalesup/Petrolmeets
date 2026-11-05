@@ -1,5 +1,5 @@
-# PetrolMeets on Netlify (GitHub-connected). Every push + every build-hook call runs the static build.
 [build]
+  base = "github-upload"
   publish = "deploy"
   command = "node site-build/build.mjs"
 
