@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600&family=DM+Serif+Display&family=Caveat:wght@600&display=swap" rel="stylesheet">
+<style>body{margin:0;}
+@font-face{font-family:'Autography';src:url('fonts/Autography.otf') format('opentype');font-display:swap;}</style>
+</helmet>
+<div style="width:100%; max-width:440px; margin:0 auto; perspective:1100px; position:relative;">
+  <div onPointerMove="{{ onMove }}" onPointerLeave="{{ onLeave }}" onClick="{{ onFlip }}" style="position:relative; width:100%; aspect-ratio:{{ aspect }}; container-type:inline-size; transform-style:preserve-3d; transform:{{ cardTransform }}; transition:{{ cardTransition }}; cursor:pointer; touch-action:pan-y; -webkit-tap-highlight-color:transparent;">
+
+    <div style="position:absolute; inset:0; border-radius:3.4cqw; overflow:hidden; backface-visibility:hidden; -webkit-backface-visibility:hidden; background-color:#222; background-image:{{ bgImg }}; background-size:100% 100%; box-shadow:0 1.5cqw 5cqw rgba(0,0,0,.4);">
+
+      <div style="position:absolute; left:{{ ph.l }}; top:{{ ph.t }}; width:{{ ph.w }}; height:{{ ph.h }}; border-radius:{{ ph.r }}; overflow:hidden; background:{{ ph.empty }}; display:grid; place-items:center;">
+        <span style="font-family:'DM Serif Display',serif; font-size:12cqw; color:{{ ph.initialColor }};">{{ initial }}</span>
+        <sc-if value="{{ hasPhoto }}" hint-placeholder-val="{{ false }}">
+          <img src="{{ photoSrc }}" alt="" draggable="false" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center 30%; filter:grayscale(1) contrast(1.06); pointer-events:none;">
+        </sc-if>
+      </div>
+
+      <sc-if value="{{ isRace }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute; left:32.6%; top:28%; width:22.4%; display:flex; flex-direction:column; gap:1.3cqw; font-family:'Montserrat',sans-serif; color:#f2f2f2;">
+          <div style="font-weight:600; font-size:4.1cqw; line-height:1.12; letter-spacing:.12em; text-transform:uppercase; overflow-wrap:anywhere; white-space:pre-line;">{{ nameTwoLine }}</div>
+          <div style="width:4cqw; height:.35cqw; background:#e52222;"></div>
+          <div style="font-weight:500; font-size:{{ carSizeRace }}; line-height:1.35; letter-spacing:.16em; color:#c8c8c8; text-transform:uppercase; overflow-wrap:anywhere; text-wrap:balance;">{{ carText }}</div>
+          <div style="font-weight:500; font-size:1.35cqw; letter-spacing:.18em; color:#8f8f8f;">NO. {{ num }}</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isStar }}" hint-placeholder-val="{{ true }}">
+        <div style="position:absolute; left:{{ tx.l }}; top:30%; width:{{ tx.w }}; display:flex; flex-direction:column; font-family:'Montserrat',sans-serif; color:{{ tx.ink }};">
+          <span style="font-weight:500; font-size:1.55cqw; letter-spacing:.2em; color:{{ tx.label }};">MEMBER</span>
+          <span style="font-family:'DM Serif Display',serif; font-size:{{ nameSize }}; line-height:1.08; margin-top:.4cqw; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ name }}</span>
+          <span style="width:5.6cqw; height:.3cqw; background:{{ tx.rule }}; margin:1.4cqw 0 1.8cqw;"></span>
+          <span style="font-weight:500; font-size:1.55cqw; letter-spacing:.2em; color:{{ tx.label }};">MEMBER ID</span>
+          <span style="font-weight:500; font-size:2.7cqw; letter-spacing:.04em; margin-top:.5cqw;">{{ num }}</span>
+          <span style="font-weight:500; font-size:1.55cqw; letter-spacing:.2em; color:{{ tx.label }}; margin-top:1.8cqw;">DRIVES</span>
+          <span style="font-weight:500; font-size:{{ carSize }}; line-height:1.25; letter-spacing:.02em; margin-top:.5cqw; overflow-wrap:anywhere; text-wrap:balance;">{{ carText }}</span>
+        </div>
+      </sc-if>
+
+      <div style="position:absolute; left:{{ sg.l }}; bottom:{{ sg.b }}; width:{{ sg.w }}; display:flex; flex-direction:column; gap:.5cqw; font-family:'Montserrat',sans-serif; color:{{ sg.ink }};">
+        <div style="height:4.4cqw; border-bottom:.2cqw solid {{ sg.line }}; display:flex; align-items:flex-end; overflow:visible;">
+            <span style="font-family:'Autography','Caveat',cursive; font-size:{{ sigSizeFront }}; line-height:1; margin-bottom:-.2cqw; white-space:nowrap;">{{ name }}</span>
+        </div>
+        <span style="font-weight:500; font-size:1.2cqw; letter-spacing:.2em; color:{{ sg.label }};">SIGNATURE</span>
+      </div>
+
+      <div style="position:absolute; inset:0; pointer-events:none; mix-blend-mode:{{ sheenBlend }}; opacity:{{ sheenOp }}; background:linear-gradient({{ sheenAngle }}deg, transparent 22%, rgba(255,90,200,.5) 36%, rgba(90,220,255,.5) 48%, rgba(255,240,120,.45) 60%, transparent 74%); background-size:220% 220%; background-position:{{ sheenPos }};"></div>
+    </div>
+
+    <div style="position:absolute; inset:0; border-radius:3.4cqw; overflow:hidden; backface-visibility:hidden; -webkit-backface-visibility:hidden; transform:rotateY(180deg); background:{{ backBg }}; color:{{ backInk }}; box-shadow:0 1.5cqw 5cqw rgba(0,0,0,.4); font-family:'Montserrat',sans-serif; display:flex; gap:5cqw; padding:5.5cqw; box-sizing:border-box;">
+      <div style="flex:none; width:34cqw; height:34cqw; align-self:center; border-radius:2.4cqw; background:#fff; padding:2.2cqw; box-sizing:border-box; display:grid; place-items:center;">
+        <sc-if value="{{ hasQr }}" hint-placeholder-val="{{ false }}"><img src="{{ qrSrc }}" alt="QR code" draggable="false" style="width:100%; height:100%; object-fit:contain; image-rendering:pixelated; pointer-events:none;"></sc-if>
+      </div>
+      <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:1.4cqw;">
+        <span style="font-weight:600; font-size:1.8cqw; letter-spacing:.2em; color:{{ backAccent }};">SCAN TO ADD FRIEND</span>
+        <span style="font-family:'DM Serif Display',serif; font-size:5.4cqw; line-height:1.05; overflow-wrap:anywhere;">{{ name }}</span>
+        <span style="font-weight:500; font-size:2.4cqw; letter-spacing:.04em; opacity:.8;">{{ igText }}</span>
+        <div style="margin-top:2cqw; height:9cqw; border-bottom:.25cqw solid {{ backLine }}; display:flex; align-items:flex-end;">
+            <span style="font-family:'Autography','Caveat',cursive; font-size:{{ sigSizeBack }}; line-height:1; margin-bottom:-.3cqw; white-space:nowrap;">{{ name }}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; gap:2cqw; font-weight:500; font-size:1.6cqw; letter-spacing:.16em; opacity:.75;">
+          <span>SIGNATURE</span><span>JOINED {{ issued }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{ locked }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute; left:0; top:0; width:100%; aspect-ratio:{{ aspect }}; border-radius:15px; background:rgba(14,16,21,.5); backdrop-filter:blur(7px); -webkit-backdrop-filter:blur(7px); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; padding:18px; box-sizing:border-box;">
+      <span style="font-family:'Montserrat',sans-serif; font-weight:600; font-size:10px; letter-spacing:.2em; color:#ff3131;">DRIVERS ONLY</span>
+      <span style="font-family:'DM Serif Display',serif; font-size:23px; line-height:1.05; color:#fff; text-wrap:balance;">Get your PetrolMeets license</span>
+      <button onClick="{{ onUnlockClick }}" style="height:40px; padding:0 18px; border:none; border-radius:13px; background:linear-gradient(180deg,#ff4f4f,#e62222); color:#111; font-family:'Montserrat',sans-serif; font-weight:600; font-size:10.5px; letter-spacing:.14em; cursor:pointer;">UNLOCK · 7 DAYS FREE</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showHintOn }}" hint-placeholder-val="{{ false }}">
+    <div style="margin-top:8px; text-align:center; font-family:'Montserrat',sans-serif; font-weight:500; font-size:9.5px; letter-spacing:.16em; color:#8a8f98;">{{ hintText }}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:440,&quot;height&quot;:300},&quot;variant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;race&quot;,&quot;cream&quot;,&quot;flag&quot;,&quot;black&quot;],&quot;default&quot;:&quot;flag&quot;,&quot;tsType&quot;:&quot;'race'|'cream'|'flag'|'black'&quot;},&quot;holder&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Wes Carter&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;car&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;1999 Nissan Skyline GT-R&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;ig&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;wes.drives&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;num&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;PM-4821-0937&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;issued&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;OCT 2026&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;photo&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string&quot;},&quot;sig&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string&quot;},&quot;qr&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string&quot;},&quot;locked&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;showHint&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;onUnlock&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;() =&gt; void&quot;}}">
+const LIC = {
+  race:  { img: 'assets/license/race.jpg',  aspect: '1.7681', ph: ['6.95%', '24.3%', '22.5%', '56.2%', '1.3cqw'], empty: 'linear-gradient(160deg,#3a3a3a,#1c1c1c)', ic: '#5a5a5a', light: false },
+  cream: { img: 'assets/license/cream.jpg', aspect: '1.6190', ph: ['3.49%', '28.97%', '25.91%', '53.37%', '1.5cqw'], empty: 'linear-gradient(160deg,#d9d9d6,#bdbdb9)', ic: '#8d8d88', light: true,
+           tx: { l: '31.4%', t: '33%', w: '30.6%', ink: '#151515', label: '#2a2a2a', rule: '#b3262a' } },
+  flag:  { img: 'assets/license/flag.jpg',  aspect: '1.5849', ph: ['3.57%', '29.13%', '26.41%', '51.89%', '1.5cqw'], empty: 'linear-gradient(160deg,#d9dde4,#b9bfca)', ic: '#8690a0', light: true,
+           tx: { l: '31.6%', t: '33%', w: '30.5%', ink: '#10213f', label: '#1f2b47', rule: '#b3262a' } },
+  black: { img: 'assets/license/black.jpg', aspect: '1.6201', ph: ['3.10%', '29.04%', '25.57%', '53.55%', '1.5cqw'], empty: 'linear-gradient(160deg,#3b3b3b,#1d1d1d)', ic: '#5d5d5d', light: false,
+           tx: { l: '30.6%', t: '33.6%', w: '31.6%', ink: '#f3f1ec', label: '#cfcac0', rule: '#cfcac0' } }
+};
+const ALIAS = { tx: 'flag', pm: 'race' };
+class Component extends DCLogic {
+  state = { flip: false, rx: 0, ry: 0, active: false };
+  renderVals() {
+    const p = this.props, s = this.state;
+    const key = LIC[p.variant] ? p.variant : (ALIAS[p.variant] || 'flag'), L = LIC[key], locked = !!p.locked;
+    const name = (p.holder || 'Your Name').trim(), parts = name.split(/\s+/);
+    const ig = (p.ig || '').replace(/^@/, ''), rot = (s.flip ? 180 : 0) + s.ry, tx = L.tx || {};
+    return {
+      aspect: L.aspect, bgImg: 'url("' + L.img + '")',
+      isRace: key === 'race', isStar: key !== 'race', locked,
+      ph: { l: L.ph[0], t: L.ph[1], w: L.ph[2], h: L.ph[3], r: L.ph[4], empty: L.empty, initialColor: L.ic },
+      tx, name, initial: name.charAt(0).toUpperCase(),
+      sg: key === 'race' ? { l: '32.6%', b: '22%', w: '22.4%', ink: '#f2f2f2', label: '#8f8f8f', line: 'rgba(255,255,255,.35)' }
+        : { l: tx.l, b: '17%', w: tx.w, ink: tx.ink, label: tx.label, line: L.light ? 'rgba(20,30,50,.35)' : 'rgba(255,255,255,.3)' },
+      sigSizeFront: name.length > 18 ? '2.6cqw' : name.length > 12 ? '3.1cqw' : '3.7cqw',
+      sigSizeBack: name.length > 18 ? '4.4cqw' : name.length > 12 ? '5.2cqw' : '6.2cqw',
+      nameTwoLine: parts.length > 1 ? parts[0] + '\n' + parts.slice(1).join(' ') : name,
+      nameSize: name.length > 16 ? '3.6cqw' : name.length > 12 ? '4.2cqw' : '4.9cqw',
+      photoSrc: p.photo || '', hasPhoto: !!p.photo,
+      
+      qrSrc: p.qr || '', hasQr: !!p.qr,
+      carText: p.car || '—',
+      carSize: (p.car || '').length > 34 ? '1.75cqw' : (p.car || '').length > 22 ? '2cqw' : '2.3cqw',
+      carSizeRace: (p.car || '').length > 34 ? '1.3cqw' : '1.55cqw', igText: ig ? '@' + ig : '', num: p.num || 'PM-0000-0000', issued: p.issued || '—',
+      backBg: L.light ? 'linear-gradient(135deg,#f3f1ea,#e2e5ea)' : 'linear-gradient(135deg,#1d1f24,#0f1013)',
+      backInk: L.light ? '#151a24' : '#f2f2f2', backAccent: key === 'black' ? '#cfcac0' : '#c62828',
+      backLine: L.light ? 'rgba(20,30,50,.4)' : 'rgba(255,255,255,.35)',
+      cardTransform: 'rotateX(' + s.rx.toFixed(2) + 'deg) rotateY(' + rot.toFixed(2) + 'deg)',
+      cardTransition: s.active ? 'transform .09s linear' : 'transform .65s cubic-bezier(.2,.75,.2,1)',
+      sheenAngle: String(Math.round(115 + s.ry * 3)), sheenBlend: L.light ? 'overlay' : 'screen',
+      sheenPos: (50 + s.ry * 4).toFixed(1) + '% ' + (50 - s.rx * 4).toFixed(1) + '%',
+      sheenOp: String(s.active ? (L.light ? 0.85 : 0.5) : (L.light ? 0.3 : 0.18)),
+      showHintOn: !locked && p.showHint !== false, hintText: s.flip ? 'TAP TO FLIP BACK' : 'TILT TO SHIMMER · TAP TO FLIP',
+      onMove: e => {
+        if (locked) return;
+        const r = e.currentTarget.getBoundingClientRect(), px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
+        if (px < 0 || px > 1 || py < 0 || py > 1) return;
+        this.setState({ active: true, ry: (px - 0.5) * 18, rx: -(py - 0.5) * 14 });
+      },
+      onLeave: () => this.setState({ active: false, rx: 0, ry: 0 }),
+      onFlip: () => { if (!locked) this.setState(st => ({ flip: !st.flip, active: false, rx: 0, ry: 0 })); },
+      onUnlockClick: e => { e.stopPropagation(); p.onUnlock && p.onUnlock(); }
+    };
+  }
+}
+</script>
+</body>
+</html>
