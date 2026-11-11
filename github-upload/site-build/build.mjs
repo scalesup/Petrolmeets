@@ -1,7 +1,7 @@
 // PetrolMeets · static site build (runs on Netlify on every deploy, every hour, and right after a post is published).
 // Reads public data from Supabase and writes real HTML pages Google can read:
 //   /meets/            this week's meets      /meets/<slug>/   one page per meet (Event schema)
-//   /news/             MAGAZINE index         /news/<slug>/    one page per story (BlogPosting schema)
+//   /news/             flip-through MAGAZINE  /news/<slug>/    one page per story (BlogPosting schema)
 //   /sitemap.xml  /rss.xml (news)  /meets/rss.xml (upcoming meets)  /robots.txt
 // It also puts real titles, descriptions and a list of meets into deploy/index.html for crawlers.
 // No npm packages. Node 18+. Needs supabase/083_store_only_seo.sql.
@@ -165,11 +165,27 @@ function postPage(p, recent, cfg) {
     + `<div style="margin-top:36px">${getApp(cfg)}</div></main>` + foot(cfg);
 }
 
-function newsIndex(posts, cfg) {
-  return head({ title: 'PetrolMeets Magazine: the Austin car scene', desc: 'Meet recaps, builds, new spots and guides from the Austin car scene.', path: '/news/', on: 'mag' })
-    + `<main class="w" style="max-width:1320px;padding-top:40px"><span class="k">PetrolMeets · Austin, TX</span><span class="script">The</span><h1 class="mag">MAGAZINE</h1><p class="dek" style="max-width:560px">Meet recaps, builds, new spots and guides from the Austin car scene.</p><div class="dash"></div>`
-    + (posts.length ? `<div class="grid">${posts.map((p, i) => tile(p, i === 0)).join('')}</div>` : '<div class="card" style="margin-top:28px;max-width:880px"><b style="font-size:19px">The first issue is on the way.</b><p class="mute" style="margin:6px 0 0"><a href="/#newsletter">Get the weekly</a> and you won’t miss it.</p></div>')
-    + `<div style="margin-top:40px;max-width:880px">${getApp(cfg)}</div></main>` + foot(cfg);
+// /news/ = the flip-through MAGAZINE (monthly issue = cover, weekly release = two-page spread; see supabase/085_magazine.sql).
+// The issue data is baked into the page for speed and crawlers, then refreshed live in the browser so a newly published
+// spread shows up without waiting for the next site build. Every story still has its own /news/<slug>/ page (listed below the reader).
+function newsIndex(posts, cfg, mag, meetsSoon) {
+  const data = { issues: (mag && mag.issues) || [], posts: (mag && mag.posts) || {}, sponsors: (mag && mag.sponsors) || { live: [] },
+    meets: meetsSoon.map(m => ({ title: m.title, starts_at: m.starts_at, area: m.area, slug: m.slug })) };
+  const has = data.issues.length > 0;
+  const boot = `<script src="/assets/magazine.js"></script><script>(function(){var D=${JSON.stringify(data).replace(/</g, '\\u003c')};`
+    + `var SB='${SB}',K='${KEY}',el=document.getElementById('pm-mag');`
+    + `function rpc(f,b){return fetch(SB+'/rest/v1/rpc/'+f,{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'},body:JSON.stringify(b||{})}).then(function(r){return r.ok?r.json():null})}`
+    + `var seen={};function ad(id,k){if(!/petrolmeets\\.com$/.test(location.hostname))return;if(k==='view'){if(seen[id])return;seen[id]=1}rpc('web_ad_count',{p_campaign:id,p_kind:k}).catch(function(){})}`
+    + `var O={chrome:250,adCount:ad};if(D.issues.length)PMMag.reader(el,D,O);`
+    + `rpc('web_magazine_full').then(function(L){if(!L||!L.issues||!L.issues.length)return;L.meets=D.meets;if(JSON.stringify(L.issues)===JSON.stringify(D.issues)&&JSON.stringify(L.sponsors)===JSON.stringify(D.sponsors))return;D=L;el.innerHTML='';PMMag.reader(el,D,O);document.getElementById('pm-mag-empty')&&document.getElementById('pm-mag-empty').remove()}).catch(function(){})})()</script>`;
+  return head({ title: 'PetrolMeets Magazine: the Austin car scene', desc: 'The Austin car scene, one issue a month and a new spread every week: meet recaps, builds, new spots and guides.', path: '/news/', on: 'mag',
+      extra: '<style>.pmm-r{margin-top:18px}</style>' })
+    + `<main class="w" style="max-width:1400px;padding-top:18px"><div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 18px"><h1 class="mag" style="font-size:clamp(40px,6vw,68px);margin:0"><span class="script" style="font-size:.62em;margin:0 .2em 0 0">The</span>MAGAZINE</h1>`
+    + `<p class="mute" style="margin:0 0 8px;font-size:15px">A new issue every month, a new spread every week. Tap a story to read it.</p></div>`
+    + `<div id="pm-mag" tabindex="-1"></div>`
+    + (has ? '' : `<div id="pm-mag-empty" class="card" style="margin-top:28px;max-width:880px"><b style="font-size:19px">The first issue is on the way.</b><p class="mute" style="margin:6px 0 0"><a href="/#newsletter">Get the weekly</a> and you won’t miss it.</p></div>`)
+    + (posts.length ? `<h2 style="margin-top:64px">Every story</h2><div class="dash" style="margin-top:0"></div><div class="grid">${posts.map((p, i) => tile(p, i === 0 && !has)).join('')}</div>` : '')
+    + `<div style="margin-top:40px;max-width:880px">${getApp(cfg)}</div></main>` + boot + foot(cfg);
 }
 
 function rss(title, link, desc, items, self) {
@@ -178,13 +194,13 @@ function rss(title, link, desc, items, self) {
 }
 
 // ---------- run ----------
-const [meetsRaw, postsRaw, cfgRaw] = await Promise.all([rpc('web_meets_build'), rpc('web_posts_build'), rpc('web_config')]);
+const [meetsRaw, postsRaw, cfgRaw, magRaw] = await Promise.all([rpc('web_meets_build'), rpc('web_posts_build'), rpc('web_config'), rpc('web_magazine_full')]);
 const cfg = cfgRaw || {};
 const meets = (meetsRaw || []).filter(m => m && m.slug);
 const posts = (postsRaw || []).filter(p => p && p.slug);
 const now = Date.now();
 const upcoming = meets.filter(m => new Date(m.ends_at || new Date(m.starts_at).getTime() + 4 * 36e5).getTime() > now);
-console.log(`meets ${meets.length} (upcoming ${upcoming.length}) · posts ${posts.length}`);
+console.log(`meets ${meets.length} (upcoming ${upcoming.length}) · posts ${posts.length} · magazine issues ${(magRaw && magRaw.issues || []).length}`);
 
 for (const d of ['meets', 'news']) { const p = join(ROOT, d); if (existsSync(p)) rmSync(p, { recursive: true, force: true }); }
 put('meets/index.html', meetsIndex(upcoming, cfg));
@@ -195,7 +211,7 @@ for (const m of meets) {
 put('meets/missing/index.html', head({ title: 'Meet | PetrolMeets', desc: 'Car meets in Austin.', path: '/meets/', extra: '<meta name="robots" content="noindex">' })
   + `<main class="w" style="padding-top:36px"><h1>Finding that meet…</h1><p class="mute" id="msg">One second.</p><p><a href="/meets/">See every meet</a></p></main>`
   + `<script>(async()=>{const u=(location.pathname.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\\/?$/i)||[])[1];if(u){location.replace('/?meet='+u);return}const k=(location.pathname.match(/-([0-9a-f]{8})\\/?$/)||[])[1];if(!k){document.getElementById('msg').textContent='That meet isn’t on the map any more.';return}try{const r=await fetch('${SB}/rest/v1/rpc/web_meet_key',{method:'POST',headers:{apikey:'${KEY}',Authorization:'Bearer ${KEY}','Content-Type':'application/json'},body:JSON.stringify({p_key:k})});const id=await r.json();if(id&&typeof id==='string'){location.replace('/?meet='+id);return}}catch(e){}document.getElementById('msg').textContent='That meet isn’t on the map any more.'})()</script>` + foot(cfg));
-put('news/index.html', newsIndex(posts, cfg));
+put('news/index.html', newsIndex(posts, cfg, magRaw, upcoming.filter(m => !m.private && m.status !== 'cancelled').slice(0, 10)));
 posts.forEach((p, i) => put('news/' + p.slug + '/index.html', postPage(p, posts.filter(x => x.slug !== p.slug).slice(0, 4), cfg)));
 
 put('rss.xml', rss('PetrolMeets Magazine', SITE + '/news/', 'Meet recaps, builds, guides and news from the Austin car scene.', posts.slice(0, 30).map(p => ({ title: p.title, link: SITE + '/news/' + p.slug + '/', date: p.published_at, desc: p.dek || '' })), SITE + '/rss.xml'));

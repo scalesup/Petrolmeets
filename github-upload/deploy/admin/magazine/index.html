@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magazine editor · PetrolMeets admin</title><meta name="robots" content="noindex">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Yellowtail&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+:root{--bg:#0E0E0D;--panel:#171715;--well:#1F1F1C;--line:rgba(255,255,255,.1);--ink:#F3F1EC;--mute:#A8A49A;--faint:#77736B;--red:#FF3131;--cyan:#22E4FE;--yel:#FFD400;--ok:#3DDC84;--card:#26261F;--hi:rgba(255,255,255,.06);--faint:#77736B}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Archivo,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan)}button,input,select,textarea{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 18px;background:rgba(14,14,13,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+header b{font-weight:900;font-style:italic;font-stretch:120%;letter-spacing:.02em;font-size:18px}header nav{display:flex;gap:14px;font-size:13px}header nav a{color:var(--mute);text-decoration:none}
+header .sp{flex:1}.st{font-size:12px;color:var(--mute);letter-spacing:.06em}
+.btn{height:38px;padding:0 14px;border:1px solid var(--line);border-radius:9px;background:var(--well);font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:rgba(255,255,255,.3)}.btn.red{background:var(--red);border-color:var(--red);color:#fff}.btn.cy{background:var(--cyan);border-color:var(--cyan);color:#111}.btn.ok{background:var(--ok);border-color:var(--ok);color:#111}
+.btn.sm{height:30px;padding:0 10px;font-size:11px}.btn:disabled{opacity:.4;cursor:default}
+.wrap{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:calc(100vh - 60px)}
+aside{border-right:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:14px;background:var(--panel)}
+aside h3,main h3{margin:0;font-size:11px;letter-spacing:.2em;color:var(--mute);text-transform:uppercase}
+.list{display:flex;flex-direction:column;gap:4px}
+.row{display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:9px;border:1px solid transparent;cursor:pointer;background:none;text-align:left;width:100%}
+.row:hover{background:var(--well)}.row.on{background:var(--well);border-color:var(--cyan)}
+.row .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.pill{font-size:10px;font-weight:900;letter-spacing:.12em;padding:3px 7px;border-radius:6px;background:#2A2A26;color:var(--mute);text-transform:uppercase}
+.pill.pub{background:rgba(61,220,132,.16);color:var(--ok)}.pill.sch{background:rgba(255,212,0,.15);color:var(--yel)}.pill.bot{background:rgba(34,228,254,.14);color:var(--cyan)}
+main{padding:18px 22px 80px;min-width:0}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:16px}.bar .sp{flex:1}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+label.f{display:grid;gap:4px;font-size:11px;letter-spacing:.14em;color:var(--mute);text-transform:uppercase;font-weight:700}
+input[type=text],input[type=url],input[type=number],input[type=month],input[type=datetime-local],select,textarea{width:100%;height:38px;border-radius:8px;border:1px solid var(--line);background:#0B0B0A;padding:0 10px;font-size:14px;letter-spacing:0;text-transform:none;font-weight:500;color:var(--ink)}
+textarea{height:auto;min-height:80px;padding:8px 10px;resize:vertical;line-height:1.4}
+.fields{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}.fields .w2{grid-column:1/-1}
+.pages{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.pcol{display:flex;flex-direction:column;gap:10px;min-width:0}
+.pcol .ph{display:flex;gap:8px;align-items:end}.pcol .ph label{flex:1}
+.prev{background:#2A2926;padding:10px;border-radius:12px}.prev .pmm-page{box-shadow:0 10px 30px -10px rgba(0,0,0,.7)}
+.items{display:flex;flex-direction:column;gap:6px}
+.it{border:1px solid var(--line);border-radius:10px;padding:8px;display:grid;gap:6px;background:#121210}.it.sel{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan) inset}
+.it .top{display:flex;align-items:center;gap:6px}.it .top .ty{font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--yel);min-width:58px}
+.it .top select{height:30px;font-size:13px}.it .top .sp{flex:1}
+.it .x{width:30px;height:30px;border-radius:7px;border:1px solid var(--line);background:none;cursor:pointer;font-weight:900}
+.it .free{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mute)}
+.adds{display:flex;flex-wrap:wrap;gap:6px}
+.note{font-size:12.5px;color:var(--mute)}.warn{color:var(--yel)}.err{color:#FF8A8A}
+.clines .cln{display:grid;grid-template-columns:110px 1fr 30px;gap:6px;margin-bottom:6px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#111;border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-weight:700;z-index:100;box-shadow:0 10px 30px rgba(0,0,0,.6)}
+.gate{max-width:520px;margin:12vh auto;text-align:center;padding:24px}
+.modal{position:fixed;inset:0;z-index:200;background:#0E0E0D;overflow:auto;padding:16px 0}
+.modal .close{position:fixed;top:12px;right:16px;z-index:210}
+.help{font-size:13px;color:var(--mute);line-height:1.5}.help code{background:#0B0B0A;padding:1px 5px;border-radius:5px;color:var(--ink)}
+@media (max-width:1100px){.pages,.grid2{grid-template-columns:1fr}}
+@media (max-width:760px){.wrap{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line)}}
+</style></head>
+<body>
+<header><b>MAGAZINE EDITOR</b><nav><a href="/admin/">Admin</a><a href="/admin/news/">Newsroom</a><a href="/news/" target="_blank">Live magazine ↗</a></nav><span class="sp"></span><span class="st" id="st"></span></header>
+<div id="app"><div class="gate">Loading…</div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="/assets/magazine.js"></script>
+<script>
+(function () {
+'use strict';
+var SB_URL = 'https://mgzzwhbagkaevycuzuuz.supabase.co', SB_KEY = 'sb_publishable_0uVcsppq6UV7Bj7aulIgIw_fai07dgC';
+var sb = window.supabase.createClient(SB_URL, SB_KEY);
+var app = document.getElementById('app'), stEl = document.getElementById('st');
+var S = { all: null, issue: null, sel: 'cover', page: 0, item: null, draft: null, dirty: false, busy: false, posts: [], sponsors: { live: [], price: 12900 } };
+var TYPES = { post: 'Story', text: 'Text box', image: 'Photo', meets: 'Meets list', sponsor: 'Sponsor box' };
+var L = PMMag.LAYOUTS;
+
+function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function h(tag, attrs, kids) { var e = document.createElement(tag); for (var k in (attrs || {})) { if (k === 'on') for (var ev in attrs.on) e.addEventListener(ev, attrs.on[ev]); else if (k === 'html') e.innerHTML = attrs[k]; else if (k === 'class') e.className = attrs[k]; else if (attrs[k] != null && attrs[k] !== false) e.setAttribute(k, attrs[k] === true ? '' : attrs[k]); } (kids || []).forEach(function (c) { if (c != null) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); }); return e; }
+function toast(t, bad) { var d = h('div', { class: 'toast' + (bad ? ' err' : '') }, [t]); document.body.appendChild(d); setTimeout(function () { d.remove(); }, bad ? 6000 : 2400); }
+function clone(o) { return JSON.parse(JSON.stringify(o)); }
+function errMsg(e) { return (e && (e.message || e.details || e.hint)) || String(e); }
+
+async function rpc(fn, args) { var r = await sb.rpc(fn, args || {}); if (r.error) throw r.error; return r.data; }
+
+async function load(keep) {
+  var d = await rpc('mag_admin_get');
+  S.all = d; S.posts = d.posts || [];
+  try { var sp = await rpc('web_mag_sponsors'); if (sp) S.sponsors = sp; } catch (e) {}
+  if (!keep || !S.issue) S.issue = (d.issues[0] || {}).id || null;
+  if (S.issue && !issue()) S.issue = (d.issues[0] || {}).id || null;
+  resetDraft(); render();
+}
+function issue() { return (S.all.issues || []).find(function (i) { return i.id === S.issue; }) || null; }
+function spread(id) { var i = issue(); return i && (i.spreads || []).find(function (s) { return s.id === id; }); }
+function resetDraft() {
+  var i = issue(); S.dirty = false; S.item = null;
+  if (!i) { S.draft = null; return; }
+  if (S.sel === 'cover') S.draft = { kind: 'issue', id: i.id, number: i.number, title: i.title, cover: Object.assign({ mode: 'auto', lines: [] }, clone(i.cover || {})), status: i.status };
+  else { var s = spread(S.sel); if (!s) { S.sel = 'cover'; return resetDraft(); } S.draft = { kind: 'spread', id: s.id, week: s.week, title: s.title, status: s.status, publish_at: s.publish_at, pages: clone(s.pages) }; }
+}
+function postMap() { var m = {}; S.posts.forEach(function (p) { m[p.slug] = p; }); return m; }
+function changed() { S.dirty = true; stEl.textContent = 'Unsaved changes'; stEl.style.color = 'var(--yel)'; }
+
+function gate(msg, link) { app.innerHTML = ''; app.appendChild(h('div', { class: 'gate' }, [h('h2', {}, [msg]), link ? h('p', { html: link }) : null])); }
+
+// ---------- render ----------
+function render() {
+  app.innerHTML = '';
+  stEl.textContent = S.dirty ? 'Unsaved changes' : 'All changes saved'; stEl.style.color = S.dirty ? 'var(--yel)' : '';
+  var wrap = h('div', { class: 'wrap' }), side = h('aside'), main = h('main');
+  wrap.appendChild(side); wrap.appendChild(main); app.appendChild(wrap);
+  // issues
+  side.appendChild(h('h3', {}, ['Issues']));
+  var il = h('div', { class: 'list' });
+  (S.all.issues || []).forEach(function (i) {
+    il.appendChild(h('button', { class: 'row' + (i.id === S.issue ? ' on' : ''), on: { click: function () { if (!leaveOk()) return; S.issue = i.id; S.sel = 'cover'; resetDraft(); render(); } } },
+      [h('span', { class: 't' }, [PMMag.monthTag(i) + ' · #' + String(i.number).padStart(2, '0')]), h('span', { class: 'pill' + (i.status === 'published' ? ' pub' : '') }, [i.status === 'published' ? 'live' : 'draft'])]));
+  });
+  side.appendChild(il);
+  var mi = h('input', { type: 'month', value: nextMonth() });
+  side.appendChild(h('div', { style: 'display:flex;gap:6px' }, [mi, h('button', { class: 'btn sm cy', on: { click: function () { newIssue(mi.value); } } }, ['+ Issue'])]));
+  var I = issue();
+  if (I) {
+    side.appendChild(h('h3', { style: 'margin-top:8px' }, [PMMag.monthTag(I) + ' pages']));
+    var sl = h('div', { class: 'list' });
+    sl.appendChild(h('button', { class: 'row' + (S.sel === 'cover' ? ' on' : ''), on: { click: function () { pick('cover'); } } }, [h('span', { class: 't' }, ['Cover'])]));
+    (I.spreads || []).forEach(function (s, k) {
+      var sch = s.status === 'published' && s.publish_at && new Date(s.publish_at) > new Date();
+      var r = h('div', { class: 'row' + (S.sel === s.id ? ' on' : ''), on: { click: function () { pick(s.id); } } },
+        [h('span', { class: 't' }, ['Week ' + s.week + (s.title ? ' · ' + s.title : '')]),
+         s.updated_by === 'bot' ? h('span', { class: 'pill bot', title: 'Last changed by Grok' }, ['bot']) : null,
+         h('span', { class: 'pill' + (sch ? ' sch' : s.status === 'published' ? ' pub' : '') }, [sch ? 'sched' : s.status === 'published' ? 'live' : 'draft']),
+         h('button', { class: 'x btn sm', title: 'Move up', disabled: k === 0, on: { click: function (e) { e.stopPropagation(); move(k, -1); } } }, ['↑']),
+         h('button', { class: 'x btn sm', title: 'Move down', disabled: k === I.spreads.length - 1, on: { click: function (e) { e.stopPropagation(); move(k, 1); } } }, ['↓'])]);
+      sl.appendChild(r);
+    });
+    side.appendChild(sl);
+    side.appendChild(h('button', { class: 'btn cy', on: { click: addSpread } }, ['+ Add a week']));
+    side.appendChild(h('button', { class: 'btn', on: { click: preview } }, ['Preview the whole issue']));
+  }
+  side.appendChild(h('h3', { style: 'margin-top:10px' }, ['Grok']));
+  var bp = h('input', { type: 'checkbox' }); bp.checked = !!S.all.bot_publish;
+  bp.addEventListener('change', async function () { try { await rpc('mag_admin_bot_publish', { p_on: bp.checked }); S.all.bot_publish = bp.checked; toast(bp.checked ? 'Grok can now publish' : 'Grok can only make drafts'); } catch (e) { bp.checked = !bp.checked; toast(errMsg(e), true); } });
+  side.appendChild(h('label', { class: 'help', style: 'display:flex;gap:8px;align-items:flex-start' }, [bp, h('span', {}, ['Let Grok publish and change live pages. Off = Grok makes drafts, you publish.'])]));
+  side.appendChild(h('p', { class: 'help', html: 'Sponsor boxes: ' + (S.sponsors.live.length ? '<b>' + S.sponsors.live.length + ' live</b>' : 'none live, so they show “Sponsor this page”') + '. Approve paid ones in <a href="/admin/">Admin → ADS</a>.' }));
+
+  if (!I) { main.appendChild(h('div', { class: 'card help', html: '<b>No issues yet.</b> Pick a month on the left and tap <b>+ Issue</b>. Each issue gets a cover, then you add one spread (two pages) per week.' })); return; }
+  if (S.sel === 'cover') coverEditor(main, I); else spreadEditor(main, I);
+}
+function nextMonth() { var ex = (S.all.issues || []).map(function (i) { return i.slug; }); var d = new Date(); for (var k = 0; k < 24; k++) { var m = new Date(d.getFullYear(), d.getMonth() + k, 1), s = m.getFullYear() + '-' + String(m.getMonth() + 1).padStart(2, '0'); if (ex.indexOf(s) < 0) return s; } return ''; }
+function leaveOk() { if (!S.dirty) return true; return window.confirm('You have unsaved changes. Leave without saving?'); }
+function pick(sel) { if (!leaveOk()) return; S.sel = sel; resetDraft(); render(); }
+
+function actions(main, label, del) {
+  var D = S.draft, live = D.status === 'published';
+  var b = h('div', { class: 'bar' }, [h('h2', { style: 'margin:0;font-style:italic;font-weight:900;font-stretch:118%' }, [label]),
+    h('span', { class: 'pill' + (live ? ' pub' : '') }, [live ? 'live' : 'draft']), h('span', { class: 'sp' }),
+    h('button', { class: 'btn', on: { click: del } }, ['Delete']),
+    h('button', { class: 'btn ' + (live ? '' : 'ok'), on: { click: function () { save(live ? 'draft' : 'published'); } } }, [live ? 'Unpublish' : 'Save + publish']),
+    h('button', { class: 'btn red', disabled: !S.dirty || S.busy, on: { click: function () { save(); } } }, [S.busy ? 'Saving…' : 'Save'])]);
+  main.appendChild(b);
+}
+
+// ---------- cover ----------
+function coverEditor(main, I) {
+  var D = S.draft, C = D.cover;
+  actions(main, PMMag.monthTag(I) + ' · Cover', function () { delIssue(I); });
+  var g = h('div', { class: 'grid2' }), left = h('div', { class: 'card', style: 'display:grid;gap:12px' }), right = h('div', { class: 'prev' });
+  g.appendChild(left); g.appendChild(right); main.appendChild(g);
+  function paint() { right.innerHTML = ''; var el = PMMag.cover({ slug: I.slug, month: I.month, number: D.number, title: D.title, cover: C }); el.style.maxWidth = '560px'; el.style.margin = '0 auto'; right.appendChild(el); }
+  function fld(lbl, key, obj, type, ph, cls) { var i = h(type === 'area' ? 'textarea' : 'input', { type: type === 'area' ? null : (type || 'text'), placeholder: ph || '' }); i.value = obj[key] == null ? '' : obj[key];
+    i.addEventListener('input', function () { obj[key] = type === 'number' ? parseInt(i.value, 10) || 1 : i.value; changed(); paint(); }); return h('label', { class: 'f' + (cls ? ' ' + cls : '') }, [lbl, i]); }
+  var mode = h('select', {}, [h('option', { value: 'auto' }, ['Design it for me (photo + cover lines)']), h('option', { value: 'image' }, ['Use my finished cover image'])]);
+  mode.value = C.mode || 'auto'; mode.addEventListener('change', function () { C.mode = mode.value; changed(); render(); });
+  left.appendChild(h('div', { class: 'fields' }, [fld('Issue number', 'number', D, 'number'), h('label', { class: 'f w2' }, ['Cover type', mode])]));
+  if (C.mode === 'image') {
+    left.appendChild(h('div', { class: 'fields' }, [fld('Finished cover image (https:// link, portrait 8.5×11)', 'image_url', C, 'url', 'https://…', 'w2')]));
+    left.appendChild(h('p', { class: 'help' }, ['Upload the image anywhere public (Canva share link to the image, Google Drive public image, Supabase Storage) and paste the direct image link.']));
+  } else {
+    var pos = h('select', {}, ['50% 50%', '50% 20%', '50% 80%', '30% 50%', '70% 50%'].map(function (v, k) { return h('option', { value: v }, [['Center', 'Top', 'Bottom', 'Left', 'Right'][k]]); }));
+    pos.value = C.photo_pos || '50% 50%'; pos.addEventListener('change', function () { C.photo_pos = pos.value; changed(); paint(); });
+    left.appendChild(h('div', { class: 'fields' }, [fld('Hero car photo (https:// link)', 'photo_url', C, 'url', 'https://…', 'w2'), h('label', { class: 'f' }, ['Photo focus', pos]),
+      fld('Top line', 'kicker', C, 'text', 'The Austin car scene'), fld('Big headline', 'headline', C, 'text', 'Meet season is on', 'w2'), fld('Under the headline', 'sub', C, 'text', '', 'w2'), fld('Starburst', 'burst', C, 'text', 'Free every week!', 'w2')]));
+    var lw = h('div', { class: 'clines' }, [h('h3', { style: 'margin:4px 0 8px' }, ['Cover lines (up to 6)'])]);
+    (C.lines = C.lines || []).forEach(function (ln, k) {
+      var tg = h('input', { type: 'text', placeholder: 'Tag (NEW)' }), tx = h('input', { type: 'text', placeholder: 'Cover line' });
+      tg.value = ln.tag || ''; tx.value = ln.text || '';
+      tg.addEventListener('input', function () { ln.tag = tg.value; changed(); paint(); }); tx.addEventListener('input', function () { ln.text = tx.value; changed(); paint(); });
+      lw.appendChild(h('div', { class: 'cln' }, [tg, tx, h('button', { class: 'x btn sm', on: { click: function () { C.lines.splice(k, 1); changed(); render(); } } }, ['✕'])]));
+    });
+    if (C.lines.length < 6) lw.appendChild(h('button', { class: 'btn sm', on: { click: function () { C.lines.push({ text: '' }); changed(); render(); } } }, ['+ Cover line']));
+    left.appendChild(lw);
+  }
+  left.appendChild(h('p', { class: 'help', html: 'The issue goes live on the site when you publish the cover <b>and</b> at least one week. Weeks you leave as drafts stay hidden.' }));
+  paint();
+}
+
+// ---------- spread ----------
+function spreadEditor(main, I) {
+  var D = S.draft;
+  actions(main, 'Week ' + D.week + (D.title ? ' · ' + D.title : ''), function () { delSpread(); });
+  var meta = h('div', { class: 'card fields', style: 'margin-bottom:16px' });
+  var wk = h('input', { type: 'number', min: 1, max: 6 }); wk.value = D.week; wk.addEventListener('input', function () { D.week = Math.min(6, Math.max(1, parseInt(wk.value, 10) || 1)); changed(); });
+  var tt = h('input', { type: 'text', placeholder: 'Nov 9–15' }); tt.value = D.title || ''; tt.addEventListener('input', function () { D.title = tt.value; changed(); repaint(); });
+  var pa = h('input', { type: 'datetime-local' }); pa.value = D.publish_at ? toLocal(D.publish_at) : ''; pa.addEventListener('input', function () { D.publish_at = pa.value ? new Date(pa.value).toISOString() : null; changed(); });
+  meta.appendChild(h('label', { class: 'f' }, ['Week #', wk])); meta.appendChild(h('label', { class: 'f' }, ['Running title', tt]));
+  meta.appendChild(h('label', { class: 'f' }, ['Release on (optional)', pa]));
+  meta.appendChild(h('p', { class: 'help w2', style: 'margin:0' }, ['Published weeks with a release time stay hidden until then, so you can line up next week now.']));
+  main.appendChild(meta);
+  var pages = h('div', { class: 'pages' }); main.appendChild(pages);
+  var previews = [];
+  [0, 1].forEach(function (pi) {
+    var P = D.pages[pi], col = h('div', { class: 'pcol' });
+    var lay = h('select', {}, Object.keys(L).map(function (k) { return h('option', { value: k }, [L[k].label]); })); lay.value = P.layout;
+    lay.addEventListener('change', function () { P.layout = lay.value; changed(); render(); });
+    var bg = h('select', {}, [h('option', { value: '' }, ['Paper']), h('option', { value: 'ink' }, ['Black'])]); bg.value = P.bg || '';
+    bg.addEventListener('change', function () { if (bg.value) P.bg = bg.value; else delete P.bg; changed(); repaint(); });
+    col.appendChild(h('div', { class: 'ph' }, [h('label', { class: 'f' }, [(pi ? 'Right' : 'Left') + ' page · layout', lay]), h('label', { class: 'f', style: 'max-width:120px' }, ['Paper', bg])]));
+    var pv = h('div', { class: 'prev' }); previews[pi] = pv; col.appendChild(pv);
+    var slots = (L[P.layout] || L.hero2).slots.length, inSlots = P.items.filter(function (it) { return !it.box; }).length;
+    col.appendChild(h('p', { class: 'note' + (P.layout !== 'list' && P.layout !== 'free' && inSlots > slots ? ' warn' : '') }, [
+      P.layout === 'free' ? 'Freeform: drag items anywhere. Select one, then drag it; pull the blue dot to resize.' :
+      P.layout === 'list' ? 'Headline list: every story here shows as a numbered line.' :
+      inSlots + ' of ' + slots + ' slots used.' + (inSlots > slots ? ' Extra items are hidden. Turn on “Place freely” for them, or pick a bigger layout.' : ' Tick “Place freely” on an item to drag it anywhere.')]));
+    var list = h('div', { class: 'items' });
+    P.items.forEach(function (it, k) { list.appendChild(itemRow(P, it, k, pi)); });
+    col.appendChild(list);
+    col.appendChild(h('div', { class: 'adds' }, Object.keys(TYPES).map(function (t) {
+      return h('button', { class: 'btn sm', disabled: P.items.length >= 12, on: { click: function () { var n = { type: t }; if (t === 'post') n.post = (S.posts[0] || {}).slug || ''; if (t === 'text') { n.title = 'Editor’s note'; n.body = ''; } if (t === 'sponsor') n.spot = 1; P.items.push(n); S.page = pi; S.item = P.items.length - 1; changed(); render(); } } }, ['+ ' + TYPES[t]]);
+    })));
+    pages.appendChild(col);
+  });
+  function repaint() {
+    var pm = postMap();
+    [0, 1].forEach(function (pi) {
+      var pv = previews[pi]; pv.innerHTML = '';
+      pv.appendChild(PMMag.page(D.pages[pi], { posts: pm, meets: sampleMeets(), sponsors: S.sponsors, edit: true, side: pi ? 'right' : 'left', num: pi + 2, run: { title: D.title || 'Week ' + D.week, issue: PMMag.monthTag(I) },
+        selected: S.page === pi ? S.item : null,
+        onSelect: function (k) { S.page = pi; S.item = k; render(); },
+        onBox: function (k, b) { D.pages[pi].items[k].box = b; changed(); repaint(); } }));
+    });
+  }
+  repaint();
+}
+function toLocal(iso) { var d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); }
+function sampleMeets() { return [{ title: 'Your meets show here', starts_at: new Date(Date.now() + 2 * 864e5).toISOString(), area: 'Austin' }, { title: 'pulled live from the map', starts_at: new Date(Date.now() + 3 * 864e5).toISOString(), area: 'Round Rock' }, { title: 'every time the page loads', starts_at: new Date(Date.now() + 4 * 864e5).toISOString(), area: 'Cedar Park' }]; }
+
+function itemRow(P, it, k, pi) {
+  var sel = S.page === pi && S.item === k, t = it.type || 'post';
+  var row = h('div', { class: 'it' + (sel ? ' sel' : ''), on: { click: function (e) { if (e.target.closest('input,select,textarea,button')) return; S.page = pi; S.item = k; render(); } } });
+  var top = h('div', { class: 'top' }, [h('span', { class: 'ty' }, [TYPES[t]])]);
+  function upd() { changed(); }
+  if (t === 'post') {
+    var ps = h('select', {}, S.posts.map(function (p) { return h('option', { value: p.slug }, [(p.status === 'published' ? '' : '[' + p.status.toUpperCase() + '] ') + p.title]); }));
+    if (it.post && !S.posts.some(function (p) { return p.slug === it.post; })) ps.appendChild(h('option', { value: it.post }, ['(missing) ' + it.post]));
+    ps.value = it.post || ''; ps.addEventListener('change', function () { it.post = ps.value; upd(); render(); });
+    top.appendChild(ps);
+  } else top.appendChild(h('span', { class: 'sp' }));
+  top.appendChild(h('button', { class: 'x', title: 'Move up', disabled: k === 0, on: { click: function () { P.items.splice(k - 1, 0, P.items.splice(k, 1)[0]); S.item = k - 1; S.page = pi; upd(); render(); } } }, ['↑']));
+  top.appendChild(h('button', { class: 'x', title: 'Move down', disabled: k === P.items.length - 1, on: { click: function () { P.items.splice(k + 1, 0, P.items.splice(k, 1)[0]); S.item = k + 1; S.page = pi; upd(); render(); } } }, ['↓']));
+  top.appendChild(h('button', { class: 'x', title: 'Move to the other page', on: { click: function () { var o = S.draft.pages[1 - pi]; if (o.items.length >= 12) return toast('That page is full', true); o.items.push(P.items.splice(k, 1)[0]); S.page = 1 - pi; S.item = o.items.length - 1; upd(); render(); } } }, [pi ? '←' : '→']));
+  top.appendChild(h('button', { class: 'x', title: 'Remove', on: { click: function () { P.items.splice(k, 1); S.item = null; upd(); render(); } } }, ['✕']));
+  row.appendChild(top);
+  if (t === 'post') {
+    var p = postMap()[it.post];
+    if (p && p.status !== 'published') row.appendChild(h('div', { class: 'note warn' }, ['This story is a ' + p.status + '. It won’t show on the live magazine until you publish it in the Newsroom.']));
+    if (sel) {
+      row.appendChild(txt('Headline on this page (optional)', 'title', it, p ? p.title : ''));
+      row.appendChild(txt('Summary on this page (optional)', 'dek', it, p ? (p.dek || '') : ''));
+      row.appendChild(txt('Photo on this page (optional https:// link)', 'image', it, p ? (p.cover_url || '') : ''));
+    }
+  } else if (t === 'text') { row.appendChild(txt('Title', 'title', it)); row.appendChild(txt('Text (**bold**, [link](https://…))', 'body', it, '', true)); }
+  else if (t === 'image') { row.appendChild(txt('Photo (https:// link)', 'image', it)); row.appendChild(txt('Caption', 'caption', it)); }
+  else if (t === 'meets') row.appendChild(txt('Heading', 'title', it, 'This weekend'));
+  else if (t === 'sponsor') {
+    var sp = h('select', {}, [1, 2, 3, 4, 5].map(function (n) { return h('option', { value: n }, ['Sponsor spot ' + n]); })); sp.value = it.spot || 1;
+    sp.addEventListener('change', function () { it.spot = parseInt(sp.value, 10); upd(); render(); });
+    row.appendChild(h('label', { class: 'f' }, ['Which paid sponsor', sp]));
+    row.appendChild(h('div', { class: 'note' }, [S.sponsors.live.length ? 'Shows live sponsor #' + (((it.spot || 1) - 1) % S.sponsors.live.length + 1) + ' of ' + S.sponsors.live.length + '.' : 'No paid sponsor is live, so this shows “Sponsor this page” with a link to buy the spot.']));
+  }
+  var fr = h('input', { type: 'checkbox' }); fr.checked = !!it.box;
+  fr.addEventListener('change', function () { if (fr.checked) it.box = slotBox(P, k); else delete it.box; S.page = pi; S.item = k; upd(); render(); });
+  row.appendChild(h('label', { class: 'free' }, [fr, 'Place freely (drag on the page)']));
+  return row;
+}
+function slotBox(P, k) {
+  var slots = (L[P.layout] || L.hero2).slots, n = 0;
+  for (var i = 0; i < P.items.length; i++) { if (P.items[i].box) continue; if (i === k) { var s = slots[n]; return s ? { x: s.x, y: s.y, w: s.w, h: s.h } : { x: 10, y: 60, w: 40, h: 25 }; } n++; }
+  return { x: 10, y: 60, w: 40, h: 25 };
+}
+function txt(lbl, key, obj, ph, area) {
+  var i = h(area ? 'textarea' : 'input', area ? {} : { type: 'text', placeholder: ph || '' }); if (area) i.placeholder = ph || '';
+  i.value = obj[key] || ''; i.addEventListener('input', function () { if (i.value) obj[key] = i.value; else delete obj[key]; changed(); });
+  i.addEventListener('change', function () { render(); });
+  return h('label', { class: 'f' }, [lbl, i]);
+}
+
+// ---------- actions ----------
+async function save(status) {
+  if (S.busy) return; S.busy = true; render();
+  var D = S.draft;
+  try {
+    if (D.kind === 'issue') {
+      var c = D.cover; c.lines = (c.lines || []).filter(function (l) { return l.text && l.text.trim(); });
+      await rpc('mag_admin_issue_save', { p: { id: D.id, number: D.number, title: D.title, cover: c, status: status || D.status } });
+    } else {
+      await rpc('mag_admin_spread_save', { p: { id: D.id, week: D.week, title: D.title, pages: D.pages, status: status || D.status, publish_at: D.publish_at || '' } });
+    }
+    S.busy = false; S.dirty = false; toast(status === 'published' ? 'Published. The live magazine updates right away.' : status === 'draft' ? 'Unpublished' : 'Saved');
+    await load(true);
+  } catch (e) { S.busy = false; render(); toast(errMsg(e), true); }
+}
+async function newIssue(m) {
+  if (!/^\d{4}-\d{2}$/.test(m || '')) return toast('Pick a month first', true);
+  if (!leaveOk()) return;
+  try { var r = await rpc('mag_admin_issue_save', { p: { slug: m, cover: { mode: 'auto', kicker: 'The Austin car scene', headline: '', lines: [] } } }); S.issue = r.id; S.sel = 'cover'; S.dirty = false; await load(true); toast('Issue created. Design the cover, then add week 1.'); }
+  catch (e) { toast(errMsg(e), true); }
+}
+async function addSpread() {
+  if (!leaveOk()) return; var I = issue(), wk = Math.min(6, (I.spreads || []).reduce(function (a, s) { return Math.max(a, s.week); }, 0) + 1);
+  try { var r = await rpc('mag_admin_spread_save', { p: { issue_id: I.id, week: wk, title: 'Week ' + wk, pages: [{ layout: 'feature', items: [] }, { layout: 'hero2', items: [] }] } }); S.dirty = false; S.sel = r.id; await load(true); }
+  catch (e) { toast(errMsg(e), true); }
+}
+async function move(k, d) {
+  var I = issue(), ids = I.spreads.map(function (s) { return s.id; }), t = ids[k]; ids[k] = ids[k + d]; ids[k + d] = t;
+  try { await rpc('mag_admin_reorder', { p_issue: I.id, p_ids: ids }); await load(true); } catch (e) { toast(errMsg(e), true); }
+}
+async function delSpread() {
+  if (!window.confirm('Delete this week’s spread? This can’t be undone.')) return;
+  try { await rpc('mag_admin_delete', { p_kind: 'spread', p_id: S.draft.id }); S.sel = 'cover'; S.dirty = false; await load(true); toast('Deleted'); } catch (e) { toast(errMsg(e), true); }
+}
+async function delIssue(I) {
+  if (!window.confirm('Delete the whole ' + PMMag.monthTag(I) + ' issue and all its weeks? This can’t be undone.')) return;
+  try { await rpc('mag_admin_delete', { p_kind: 'issue', p_id: I.id }); S.issue = null; S.sel = 'cover'; S.dirty = false; await load(); toast('Issue deleted'); } catch (e) { toast(errMsg(e), true); }
+}
+function preview() {
+  var I = clone(issue()); if (!I) return;
+  if (S.draft && S.draft.kind === 'issue') I.cover = S.draft.cover;
+  if (S.draft && S.draft.kind === 'spread') I.spreads = I.spreads.map(function (s) { return s.id === S.draft.id ? Object.assign({}, s, { pages: S.draft.pages, title: S.draft.title, week: S.draft.week }) : s; });
+  var m = h('div', { class: 'modal' }), box = h('div', {}), x = h('button', { class: 'btn red close', on: { click: function () { m.remove(); } } }, ['Close preview']);
+  m.appendChild(x); m.appendChild(h('p', { class: 'help', style: 'text-align:center;margin:6px 0 14px' }, ['Preview, drafts included. Visitors only see published weeks.'])); m.appendChild(box); document.body.appendChild(m);
+  PMMag.reader(box, { issues: [I], posts: postMap(), meets: sampleMeets(), sponsors: S.sponsors }, { noHash: true, chrome: 120 });
+}
+addEventListener('beforeunload', function (e) { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+// ---------- start ----------
+(async function () {
+  var s = await sb.auth.getSession();
+  if (!s.data || !s.data.session) return gate('You’re signed out.', 'Sign in on <a href="/app/">petrolmeets.com/app/</a> with your admin account, then come back here.');
+  try { await load(); }
+  catch (e) { if (/not allowed/i.test(errMsg(e))) gate('This account isn’t a moderator.'); else gate('Couldn’t load the magazine.', esc(errMsg(e)) + '<br><br>Has <code>supabase/085_magazine.sql</code> been run in Supabase?'); }
+})();
+})();
+</script>
+</body></html>
