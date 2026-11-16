@@ -1,2 +1,9 @@
+# Old / alternate paths
+/blog            /news/   301
+/blog/*          /news/   301
+# Merged duplicate listing (Nov 16)
+/meets/auto-otaku-2026-texas-jdm-euro-car-event-d753cd51/*   /meets/auto-otaku-2026-989a062b/   301
+/meets/auto-otaku-2026-texas-jdm-euro-car-event-d753cd51     /meets/auto-otaku-2026-989a062b/   301
+
 # Meet pages that were added since the last build → small page that finds the meet and opens it on the map.
 /meets/*   /meets/missing/index.html   200

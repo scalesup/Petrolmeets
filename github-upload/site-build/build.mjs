@@ -29,6 +29,15 @@ const time = d => fmt(d, { hour: 'numeric', minute: '2-digit' });
 const iso = d => new Date(d).toISOString();
 const NOTICE = { cancelled: 'Canceled', postponed: 'Rain delay / postponed', moved: 'New location', time_changed: 'Time changed', full: 'Full' };
 const noticeOf = m => m.status === 'cancelled' ? 'cancelled' : m.notice || '';
+// Metro = within ~50 miles of downtown Austin. Farther meets still get a page, but sit under "Road trips".
+const HQ = [30.2672, -97.7431], METRO_MI = 50;
+const miles = m => { const a = +m.lat, b = +m.lng; if (!Number.isFinite(a) || !Number.isFinite(b)) return 0; const r = x => x * Math.PI / 180, dA = r(a - HQ[0]), dB = r(b - HQ[1]); const h = Math.sin(dA / 2) ** 2 + Math.cos(r(HQ[0])) * Math.cos(r(a)) * Math.sin(dB / 2) ** 2; return 7917.6 * Math.asin(Math.sqrt(h)); };
+const inMetro = m => miles(m) <= METRO_MI;
+const endOf = m => m.ends_at || new Date(new Date(m.starts_at).getTime() + 4 * 36e5).toISOString();
+const ORG = { '@type': 'Organization', '@id': SITE + '/#org', name: 'PetrolMeets', url: SITE + '/', logo: SITE + '/icons/icon-512.png', email: 'info@petrolmeets.com',
+  sameAs: ['https://x.com/PetrolMeets', 'https://www.instagram.com/petrolmeets', 'https://www.tiktok.com/@petrolmeets'] };
+const postUrl = p => (p.sponsor ? '/sponsored/' : '/news/') + p.slug + '/';
+const freeOf = m => /^free$/i.test(String(m.entry || '').trim()) ? true : /\$\s*\d/.test(String(m.entry || '')) ? false : null;
 
 // ---------- shared page shell (Blaze v4 look · LIGHT / DARK, same as the homepage; choice in localStorage pm-theme) ----------
 const CSS = `*{box-sizing:border-box}
@@ -69,7 +78,9 @@ ul.list{list-style:none;padding:0;margin:0;display:grid;gap:12px}ul.list a{displ
 .post img{max-width:100%;border-radius:14px}.post h2,.post h3{color:var(--ink)}.post h3{font-size:22px;font-weight:800;margin:32px 0 8px}
 .post blockquote{margin:28px 0;padding:4px 0 4px 20px;border-left:4px solid var(--orange);font-size:22px;font-weight:700;font-style:italic;line-height:1.4}
 .ft{margin-top:72px;border-top:1px solid var(--line)}.ft .w{max-width:1320px;padding:44px clamp(16px,4.5vw,28px) 36px;display:grid;gap:22px;justify-items:center;text-align:center}
-.ft img{height:72px;width:auto}.ft nav{display:flex;gap:10px 22px;flex-wrap:wrap;justify-content:center;font-size:14px}.ft nav a{color:var(--mute)}.ft small{font-size:12.5px;color:var(--faint)}`;
+.ft img{height:72px;width:auto}.ft nav{display:flex;gap:10px 22px;flex-wrap:wrap;justify-content:center;font-size:14px}.ft nav a{color:var(--mute)}.ft small{font-size:12.5px;color:var(--faint)}
+.nl{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0}.nl input{flex:1 1 220px;min-width:0;height:48px;padding:0 14px;border:0;border-radius:12px;background:var(--well);color:var(--ink);font:16px Archivo,system-ui,sans-serif;box-shadow:inset 2px 3px 6px rgba(0,0,0,.1)}.nl .btn{border:0;cursor:pointer;font-family:inherit}.nl .nlm{flex-basis:100%;margin:0;font-size:14px}.nl .nlm:empty{display:none}
+.spon{display:inline-block;background:#FFD400;color:#141414;font-size:11px;font-weight:900;letter-spacing:.18em;padding:5px 9px;border-radius:6px}`;
 const LOOK = '<div class="look" role="group" aria-label="Site look"><button type="button" data-look="oconner" title="Light look">LIGHT</button><button type="button" data-look="han" title="Dark neon look">DARK</button></div>';
 const THEME_EARLY = "<script>try{if(localStorage.getItem('pm-theme')==='han')document.documentElement.setAttribute('data-theme','han')}catch(e){}</script>";
 const THEME_JS = "<script>(function(){var d=document.documentElement;function sync(){var h=d.getAttribute('data-theme')==='han';document.querySelectorAll('[data-look]').forEach(function(b){b.setAttribute('aria-pressed',String((b.getAttribute('data-look')==='han')===h))});var m=document.querySelector('meta[name=theme-color]');if(m)m.content=h?'#07060D':'#EFECEE'}document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-look]');if(!b)return;var t=b.getAttribute('data-look');if(t==='han')d.setAttribute('data-theme','han');else d.removeAttribute('data-theme');try{localStorage.setItem('pm-theme',t)}catch(x){}sync()});sync()})();</script>";
@@ -80,15 +91,16 @@ const head = ({ title, desc, path, image, ld, type = 'website', extra = '', on =
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Yellowtail&display=swap" rel="stylesheet">
 <style>${CSS}</style>${ld ? `<script type="application/ld+json">${JSON.stringify(ld).replace(/</g, '\\u003c')}</script>` : ''}${extra}</head><body>
 <header class="hd"><div class="bar"><a class="logo" href="/"><img src="/assets/pm-emblem.png" alt=""><span class="p">Petrol</span><span class="m">MEETS</span></a><nav><a href="/meets/"${on === 'meets' ? ' class="on"' : ''}>Meets</a><a href="/#map">Map</a><a href="/news/"${on === 'mag' ? ' class="on"' : ''}>Magazine</a><a href="/#join">Promoters</a><a href="/advertise/">Advertise</a></nav>${LOOK}</div></header>`;
-const foot = (cfg) => `<footer class="ft"><div class="w"><img src="/assets/pm-emblem.png" alt=""><nav><a href="/meets/">All meets</a><a href="/news/">Magazine</a><a href="/advertise/">Advertise</a><a href="/rss.xml">RSS</a><a href="/terms/">Terms</a><a href="/privacy/">Privacy</a><a href="/guidelines/">Guidelines</a>${cfg.ios ? `<a href="${esc(cfg.ios)}">App Store</a>` : ''}${cfg.android ? `<a href="${esc(cfg.android)}">Google Play</a>` : ''}<a href="mailto:info@petrolmeets.com">info@petrolmeets.com</a></nav>${LOOK}<small>© ${new Date().getFullYear()} PetrolMeets · Austin, Texas</small></div></footer>${THEME_JS}</body></html>`;
+const NL_JS = `<script>document.addEventListener('submit',function(e){var f=e.target;if(!f.classList||!f.classList.contains('nl'))return;e.preventDefault();var i=f.querySelector('input'),m=f.querySelector('.nlm'),b=f.querySelector('button'),v=(i.value||'').trim();if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(v)){m.textContent='Add a valid email.';i.focus();return}b.disabled=true;m.textContent='One sec…';fetch('${SB}/functions/v1/newsletter',{method:'POST',headers:{'Content-Type':'application/json',apikey:'${KEY}'},body:JSON.stringify({action:'subscribe',email:v,source:'web-'+(location.pathname.split('/')[1]||'home')})}).then(function(r){return r.json()}).then(function(d){if(d&&d.ok){f.innerHTML='<p style=\\'margin:0;font-weight:700\\'>'+(d.already?'You’re already on the list. See you Thursday.':'Check your inbox and tap the link to confirm.')+'</p>'}else{b.disabled=false;m.textContent='Couldn’t sign you up just now. Try again.'}}).catch(function(){b.disabled=false;m.textContent='Couldn’t sign you up just now. Try again.'})});</script>`;
+const foot = (cfg) => `<footer class="ft"><div class="w"><img src="/assets/pm-emblem.png" alt=""><nav><a href="/meets/">All meets</a><a href="/news/">Magazine</a><a href="/sponsored/">Sponsored</a><a href="/advertise/">Advertise</a><a href="/rss.xml">RSS</a><a href="/terms/">Terms</a><a href="/privacy/">Privacy</a><a href="/guidelines/">Guidelines</a>${cfg.ios ? `<a href="${esc(cfg.ios)}">App Store</a>` : ''}${cfg.android ? `<a href="${esc(cfg.android)}">Google Play</a>` : ''}<a href="mailto:info@petrolmeets.com">info@petrolmeets.com</a></nav>${LOOK}<small>© ${new Date().getFullYear()} PetrolMeets · Austin, Texas</small></div></footer>${THEME_JS}${NL_JS}</body></html>`;
 const getApp = cfg => cfg.app_public && (cfg.ios || cfg.android)
   ? `<div class="card"><b style="font-size:19px">Get PetrolMeets on your phone</b><p class="mute" style="margin:6px 0 0">Drive mode, convoys with friends and check-ins live in the app.</p><div class="btns">${cfg.ios ? `<a class="btn" href="${esc(cfg.ios)}">App Store</a>` : ''}${cfg.android ? `<a class="btn" href="${esc(cfg.android)}">Google Play</a>` : ''}</div></div>`
-  : `<div class="card"><span class="script" style="font-size:36px;margin:0 0 4px">The weekly</span><div style="font-weight:900;font-style:italic;font-stretch:118%;font-size:22px;line-height:1.1">THE WEEKEND’S MEETS, BEFORE THE WEEKEND.</div><p class="mute" style="margin:8px 0 0">Free. One email every Thursday. The app for iPhone and Android is coming soon.</p><div class="btns"><a class="btn" href="/#newsletter">Get the weekly →</a></div></div>`;
+  : `<div class="card"><span class="script" style="font-size:36px;margin:0 0 4px">The weekly</span><div style="font-weight:900;font-style:italic;font-stretch:118%;font-size:22px;line-height:1.1">THE WEEKEND’S MEETS, BEFORE THE WEEKEND.</div><p class="mute" style="margin:8px 0 0">Free. One email every Thursday. The app for iPhone and Android is coming soon.</p><form class="nl" novalidate><input type="email" name="email" required autocomplete="email" placeholder="you@email.com" aria-label="Your email"><button class="btn" type="submit">Get the weekly →</button><p class="nlm mute" role="status" aria-live="polite"></p></form></div>`;
 
 // ---------- tiny markdown ----------
-function md(src) {
+function md(src, sponsored) {
   const inl = t => esc(t).replace(/!\[([^\]]*)\]\((https:\/\/[^)\s]+)\)/g, '<img src="$2" alt="$1" loading="lazy">')
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+|\/[^)\s]*)\)/g, (m, a, h) => `<a href="${h}"${/^https?:\/\/(?!petrolmeets\.com)/.test(h) ? ' rel="noopener"' : ''}>${a}</a>`)
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+|\/[^)\s]*)\)/g, (m, a, h) => `<a href="${h}"${/^https?:\/\/(?!petrolmeets\.com)/.test(h) ? (sponsored ? ' rel="sponsored noopener"' : ' rel="noopener"') : ''}>${a}</a>`)
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>');
   return String(src || '').replace(/\r/g, '').trim().split(/\n{2,}/).map(b => {
     if (/^### /.test(b)) return '<h3>' + inl(b.slice(4)) + '</h3>';
@@ -107,20 +119,20 @@ const meetDesc = m => {
 const appLinks = m => ({ apple: `https://maps.apple.com/?daddr=${m.lat},${m.lng}&q=${encodeURIComponent(m.venue || m.title)}&dirflg=d`, google: `https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lng}&travelmode=driving`, waze: `https://waze.com/ul?ll=${m.lat},${m.lng}&navigate=yes` });
 
 function meetPage(m, others, cfg) {
-  const path = '/meets/' + m.slug + '/', n = noticeOf(m), ended = new Date(m.ends_at || new Date(m.starts_at).getTime() + 4 * 36e5) < new Date();
+  const path = '/meets/' + m.slug + '/', n = noticeOf(m), ended = new Date(endOf(m)) < new Date(), far = !inMetro(m), free = freeOf(m);
   const status = { cancelled: 'EventCancelled', postponed: 'EventPostponed', moved: 'EventRescheduled', time_changed: 'EventRescheduled' }[n] || 'EventScheduled';
-  const ld = { '@context': 'https://schema.org', '@type': 'Event', name: m.title, startDate: iso(m.starts_at), ...(m.ends_at ? { endDate: iso(m.ends_at) } : {}),
+  const ld = { '@context': 'https://schema.org', '@type': 'Event', name: m.title, startDate: iso(m.starts_at), endDate: iso(endOf(m)),
     eventStatus: 'https://schema.org/' + status, eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode', url: SITE + path, image: [SITE + '/og.png'],
     description: meetDesc(m),
     location: { '@type': 'Place', name: m.private ? (m.area || 'Austin area') : (m.venue || m.area), address: m.private ? { '@type': 'PostalAddress', addressLocality: m.area, addressRegion: 'TX', addressCountry: 'US' } : (m.address || m.area + ', TX'),
       ...(m.private ? {} : { geo: { '@type': 'GeoCoordinates', latitude: m.lat, longitude: m.lng } }) },
-    ...(m.org ? { organizer: { '@type': 'Organization', name: m.org.name || '@' + m.org.handle, ...(m.org.handle ? { url: 'https://instagram.com/' + String(m.org.handle).replace(/^@/, '') } : {}) } } : {}),
-    ...(/^free$/i.test(String(m.entry || '').trim()) ? { isAccessibleForFree: true } : {}) };
+    ...(m.org ? { organizer: { '@type': 'Organization', name: m.org.name || '@' + m.org.handle, ...(/^@?[A-Za-z0-9._]{2,30}$/.test(String(m.org.handle || '')) ? { url: 'https://www.instagram.com/' + String(m.org.handle).replace(/^@/, '') + '/' } : {}) } } : {}),
+    ...(free !== null ? { isAccessibleForFree: free } : {}) };
   const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Meets', item: SITE + '/meets/' }, { '@type': 'ListItem', position: 2, name: m.title, item: SITE + path }] };
   const L = !m.private && Number.isFinite(+m.lat) ? appLinks(m) : null;
   const kindLabel = m.kind === 'drive' ? 'Drive / cruise' : m.kind === 'event' ? 'Event' : 'Car meet';
   return head({ title: `${n ? NOTICE[n] + ': ' : ''}${m.title} · ${fmt(m.starts_at, { weekday: 'short', month: 'short', day: 'numeric' })} · ${m.area || 'Austin'} car meet | PetrolMeets`, desc: meetDesc(m), path, ld: [ld, crumbs], type: 'event', on: 'meets' })
-    + `<main class="w" style="padding-top:36px"><div class="k">${esc(kindLabel)} · ${esc(m.area || 'Austin area')}</div><h1>${esc(m.title)}</h1>`
+    + `<main class="w" style="padding-top:36px"><div class="k">${esc(kindLabel)} · ${esc(m.area || 'Austin area')}${far ? ' · Road trip, ' + Math.round(miles(m)) + ' mi from Austin' : ''}</div><h1>${esc(m.title)}</h1>`
     + (n ? `<div class="notice" role="status"><b>${esc(NOTICE[n])}</b>${m.notice_note ? `<div style="margin-top:4px">${esc(m.notice_note)}</div>` : ''}</div>` : '')
     + (ended ? `<div class="notice"><b>This meet has ended</b><div style="margin-top:4px">See what’s on next below.</div></div>` : '')
     + `<div class="card"><dl class="row"><dt>When</dt><dd><b>${esc(day(m.starts_at))}</b><br>${esc(time(m.starts_at))}${m.ends_at ? ' – ' + esc(time(m.ends_at)) : ''} Central</dd>`
@@ -129,38 +141,51 @@ function meetPage(m, others, cfg) {
     + (m.entry ? `<dt>Entry</dt><dd>${esc(m.entry)}</dd>` : '')
     + (m.org ? `<dt>Host</dt><dd>${esc(m.org.name || '')}${m.org.handle ? ` <a href="https://instagram.com/${esc(String(m.org.handle).replace(/^@/, ''))}" rel="noopener">@${esc(String(m.org.handle).replace(/^@/, ''))}</a>` : ''}</dd>` : '')
     + `</dl>` + (L && !ended && n !== 'cancelled' ? `<div class="btns"><a class="btn" href="${esc(L.apple)}">Apple Maps</a><a class="btn" href="${esc(L.google)}">Google Maps</a><a class="btn" href="${esc(L.waze)}">Waze</a></div>` : '')
-    + `<div class="btns"><a class="btn line" href="/?meet=${m.id}">See it on the map</a></div><p class="mute" style="font-size:13px;margin:0">Check the host’s post before you go. Times and places can change. Don’t use your phone while driving.</p></div>`
+    + `<div class="btns"><a class="btn line" href="/?meet=${m.id}">See it on the map</a></div><p class="mute" style="font-size:13px;margin:0">Plans change. Latest details live on the host’s post. Don’t use your phone while driving.</p></div>`
     + `<h2>More meets around Austin</h2><ul class="list">${others.map(o => `<li><a class="card" href="/meets/${o.slug}/"><span class="k">${esc(fmt(o.starts_at, { weekday: 'short', month: 'short', day: 'numeric' }))} · ${esc(time(o.starts_at))}</span><div class="t">${esc(o.title)}</div><span class="mute">${esc(o.area || '')}</span></a></li>`).join('')}</ul>`
     + `<div style="margin-top:28px">${getApp(cfg)}</div></main>` + foot(cfg);
 }
 
-function meetsIndex(list, cfg) {
+function meetsIndex(all, cfg) {
+  const list = all.filter(inMetro), road = all.filter(m => !inMetro(m));
   const groups = []; list.forEach(m => { const k = day(m.starts_at); let g = groups.find(x => x.k === k); if (!g) groups.push(g = { k, items: [] }); g.items.push(m); });
   const ld = { '@context': 'https://schema.org', '@type': 'ItemList', itemListElement: list.slice(0, 50).map((m, i) => ({ '@type': 'ListItem', position: i + 1, url: SITE + '/meets/' + m.slug + '/', name: m.title })) };
   return head({ title: 'Car meets in Austin this week | PetrolMeets', desc: `${list.length} car meets, cruises and car shows around Austin, Texas coming up. Cars & coffee, JDM, Euro, trucks and more.`, path: '/meets/', ld, on: 'meets' })
     + `<main class="w" style="padding-top:36px"><div class="k">Austin, TX · ${list.length} coming up</div><span class="script">Every car meet in</span><h1 class="mag" style="text-shadow:var(--hs-c)">AUSTIN</h1><div class="btns"><a class="btn" href="/#map">Open the map →</a></div><div class="dash"></div>`
     + groups.map(g => `<h2>${esc(g.k)}</h2><ul class="list">${g.items.map(m => { const n = noticeOf(m); return `<li><a class="card" href="/meets/${m.slug}/"><span class="k">${esc(time(m.starts_at))} · ${esc(m.kind === 'drive' ? 'Drive' : m.kind === 'event' ? 'Event' : 'Meet')}${n ? ' · ' + esc(NOTICE[n]) : ''}</span><div class="t">${esc(m.title)}</div><span class="mute">${esc(m.area || '')}${m.scenes?.length ? ' · ' + esc(m.scenes.join(', ')) : ''}</span></a></li>`; }).join('')}</ul>`).join('')
     + (list.length ? '' : '<p>No meets on the map right now. New ones go up every night.</p>')
+    + (road.length ? `<h2>Road trips</h2><p class="mute" style="margin-top:-6px">Worth the drive: more than ${METRO_MI} miles from Austin.</p><ul class="list">${road.map(m => `<li><a class="card" href="/meets/${m.slug}/"><span class="k">${esc(fmt(m.starts_at, { weekday: 'short', month: 'short', day: 'numeric' }))} · ${esc(time(m.starts_at))} · ${Math.round(miles(m))} mi</span><div class="t">${esc(m.title)}</div><span class="mute">${esc(m.area || '')}</span></a></li>`).join('')}</ul>` : '')
     + `<div style="margin-top:28px">${getApp(cfg)}</div></main>` + foot(cfg);
 }
 
-const tagOf = p => p.sponsor ? 'Partner · ' + p.sponsor.advertiser : (p.tag || 'Feature');
+const tagOf = p => p.sponsor ? 'Sponsored · ' + p.sponsor.advertiser : (p.tag || 'Feature');
 const coverStyle = p => p.cover_url && /^https:\/\//.test(p.cover_url) ? ` style="background-image:url('${esc(p.cover_url).replace(/'/g, '%27')}')"` : '';
-const tile = (p, lead) => `<a class="tile${lead ? ' lead' : ''}" href="/news/${esc(p.slug)}/"><div class="ph"${coverStyle(p)}></div><div style="display:grid;gap:10px"><span class="k">${esc(tagOf(p))} · ${esc(fmt(p.published_at, { month: 'short', day: 'numeric' }))}</span><span class="t">${esc(p.title)}</span>${p.dek ? `<span class="d">${esc(p.dek)}</span>` : ''}</div></a>`;
+const tile = (p, lead) => `<a class="tile${lead ? ' lead' : ''}" href="${esc(postUrl(p))}"><div class="ph"${coverStyle(p)}></div><div style="display:grid;gap:10px"><span class="k">${esc(tagOf(p))} · ${esc(fmt(p.published_at, { month: 'short', day: 'numeric' }))}</span><span class="t">${esc(p.title)}</span>${p.dek ? `<span class="d">${esc(p.dek)}</span>` : ''}</div></a>`;
+
+// "## Question?" headings followed by text become FAQPage answers (needs 2+).
+function faqOf(src) {
+  const out = []; let q = null, a = [];
+  const flush = () => { if (q && a.length) out.push({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a.join(' ').replace(/[*_>#`]/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/\s+/g, ' ').trim().slice(0, 1200) } }); q = null; a = []; };
+  String(src || '').replace(/\r/g, '').split(/\n{2,}/).forEach(b => { const hm = b.match(/^#{2,3} (.+\?)\s*$/); if (hm) { flush(); q = hm[1].trim(); } else if (/^#/.test(b)) flush(); else if (q) a.push(b.replace(/^\s*[-*\d.]+\s+/gm, '')); });
+  flush(); return out.length >= 2 ? { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: out } : null;
+}
 
 function postPage(p, recent, cfg) {
-  const path = '/news/' + p.slug + '/', title = p.seo_title || p.title, desc = p.seo_desc || p.dek || p.title;
-  const ld = { '@context': 'https://schema.org', '@type': 'BlogPosting', headline: p.title, description: desc, datePublished: iso(p.published_at), dateModified: iso(p.updated_at || p.published_at),
+  const sp = p.sponsor, path = postUrl(p), title = p.seo_title || p.title, desc = p.seo_desc || p.dek || p.title;
+  const ld = { '@context': 'https://schema.org', '@type': 'Article', headline: p.title, description: desc, datePublished: iso(p.published_at), dateModified: iso(p.updated_at || p.published_at),
     author: { '@type': 'Organization', name: p.author || 'PetrolMeets' }, publisher: { '@type': 'Organization', name: 'PetrolMeets', logo: { '@type': 'ImageObject', url: SITE + '/icons/icon-512.png' } },
-    mainEntityOfPage: SITE + path, image: [p.cover_url || SITE + '/og.png'] };
-  const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Magazine', item: SITE + '/news/' }, { '@type': 'ListItem', position: 2, name: p.title, item: SITE + path }] };
-  return head({ title: title + ' | PetrolMeets Magazine', desc, path, image: p.cover_url, ld: [ld, crumbs], type: 'article', on: 'mag' })
-    + `<main class="w" style="padding-top:40px"><a href="/news/" class="k">Magazine · ${esc(tagOf(p))}</a><h1>${esc(p.title)}</h1>`
+    mainEntityOfPage: SITE + path, image: [p.cover_url || SITE + '/og.png'], ...(sp ? { sponsor: { '@type': 'Organization', name: sp.advertiser, ...(sp.link ? { url: sp.link } : {}) } } : {}) };
+  const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: sp ? 'Sponsored posts' : 'Magazine', item: SITE + (sp ? '/sponsored/' : '/news/') }, { '@type': 'ListItem', position: 2, name: p.title, item: SITE + path }] };
+  const faq = faqOf(p.body_md);
+  return head({ title: title + (sp ? ' | Sponsored | PetrolMeets' : ' | PetrolMeets Magazine'), desc, path, image: p.cover_url, ld: [ld, crumbs, ...(faq ? [faq] : [])], type: 'article', on: 'mag' })
+    + `<main class="w" style="padding-top:40px">` + (sp ? `<p style="margin:0 0 12px"><span class="spon">SPONSORED</span> <span class="mute" style="font-size:14px">Paid partnership with ${esc(sp.advertiser)}. <a href="/sponsored/">All sponsored posts</a></span></p>` : '')
+    + `<a href="${sp ? '/sponsored/' : '/news/'}" class="k">${sp ? 'Sponsored post' : 'Magazine · ' + esc(tagOf(p))}</a><h1>${esc(p.title)}</h1>`
     + (p.dek ? `<p class="dek">${esc(p.dek)}</p>` : '')
     + `<p class="mute" style="font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;margin:12px 0 0">${esc(p.author || 'PetrolMeets')} · ${esc(fmt(p.published_at, { month: 'long', day: 'numeric', year: 'numeric' }))}</p>`
     + (p.cover_url ? `<img class="cover" src="${esc(p.cover_url)}" alt="">` : '<div class="dash" style="margin:26px 0 30px"></div>')
-    + (p.sponsor ? `<p class="mute" style="font-size:14px">This story is sponsored by ${p.sponsor.link ? `<a href="${esc(p.sponsor.link)}" rel="sponsored noopener">${esc(p.sponsor.advertiser)}</a>` : esc(p.sponsor.advertiser)}.</p>` : '')
-    + `<article class="post">${md(p.body_md)}</article>`
+    + (sp ? `<p class="mute" style="font-size:14px">This post is paid for by ${sp.link ? `<a href="${esc(sp.link)}" rel="sponsored noopener">${esc(sp.advertiser)}</a>` : esc(sp.advertiser)}. PetrolMeets wrote it with them.</p>` : '')
+    + `<article class="post">${md(p.body_md, !!sp)}</article>`
+    + (sp && sp.link ? `<div class="btns"><a class="btn" href="${esc(sp.link)}" rel="sponsored noopener">Visit ${esc(sp.advertiser)} →</a></div>` : '')
     + (recent.length ? `<h2>More from the Magazine</h2><div class="grid" style="margin-top:0">${recent.map(r => tile(r)).join('')}</div>` : '')
     + `<div style="margin-top:36px">${getApp(cfg)}</div></main>` + foot(cfg);
 }
@@ -184,8 +209,46 @@ function newsIndex(posts, cfg, mag, meetsSoon) {
     + `<p class="mute" style="margin:0 0 8px;font-size:15px">A new issue every month, a new spread every week. Tap a story to read it.</p></div>`
     + `<div id="pm-mag" tabindex="-1"></div>`
     + (has ? '' : `<div id="pm-mag-empty" class="card" style="margin-top:28px;max-width:880px"><b style="font-size:19px">The first issue is on the way.</b><p class="mute" style="margin:6px 0 0"><a href="/#newsletter">Get the weekly</a> and you won’t miss it.</p></div>`)
+    + `<p style="margin:22px 0 0;font-size:14px"><a href="/sponsored/">Sponsored posts from Austin car businesses →</a></p>`
     + (posts.length ? `<h2 style="margin-top:64px">Every story</h2><div class="dash" style="margin-top:0"></div><div class="grid">${posts.map((p, i) => tile(p, i === 0 && !has)).join('')}</div>` : '')
     + `<div style="margin-top:40px;max-width:880px">${getApp(cfg)}</div></main>` + boot + foot(cfg);
+}
+
+function sponsoredIndex(list, cfg) {
+  const ld = { '@context': 'https://schema.org', '@type': 'ItemList', itemListElement: list.map((p, i) => ({ '@type': 'ListItem', position: i + 1, url: SITE + postUrl(p), name: p.title })) };
+  return head({ title: 'Sponsored posts | PetrolMeets', desc: 'Every sponsored post on PetrolMeets: Austin car shops, detailers and businesses, written with PetrolMeets and clearly labelled.', path: '/sponsored/', ld, on: 'mag' })
+    + `<main class="w" style="padding-top:36px"><div class="k">Paid partnerships</div><h1>Sponsored posts</h1><p class="dek">Austin car businesses we’ve written about with them. Every one is paid for and labelled sponsored.</p><div class="dash"></div>`
+    + (list.length ? `<div class="grid">${list.map(p => tile(p)).join('')}</div>` : `<p class="mute" style="margin-top:24px">No sponsored posts yet.</p>`)
+    + `<div class="card" style="margin-top:32px"><b style="font-size:19px">Want your shop here?</b><p class="mute" style="margin:6px 0 0">A sponsored post gets its own page that stays up for good, plus a highlight in the Magazine.</p><div class="btns"><a class="btn" href="/advertise/?package=post">See sponsored posts →</a></div></div>`
+    + `<div style="margin-top:28px">${getApp(cfg)}</div></main>` + foot(cfg);
+}
+const moved = to => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Moved</title><link rel="canonical" href="${SITE}${to}"><meta name="robots" content="noindex"><meta http-equiv="refresh" content="0;url=${to}"></head><body><a href="${to}">This post moved here.</a></body></html>`;
+
+// /llms.txt: a plain summary for AI assistants.
+function llms(upcoming, posts) {
+  const metro = upcoming.filter(m => inMetro(m) && !m.private && m.status !== 'cancelled').slice(0, 40);
+  return `# PetrolMeets
+
+> PetrolMeets lists every car meet, cars & coffee, cruise and car show in Austin, Texas and Central Texas on one map. Free to use. Website: ${SITE}. Contact: info@petrolmeets.com.
+
+PetrolMeets is based in Austin, Texas. Meets are checked before they go on the map. Each meet has its own page with the date, time, place and host. There is a free weekly email every Thursday and a monthly online magazine about the Austin car scene.
+
+## Main pages
+- [Car meets in Austin this week](${SITE}/meets/): every upcoming meet, by day
+- [Map](${SITE}/): all meets on a live map
+- [Magazine](${SITE}/news/): guides, meet recaps and builds
+- [Sponsored posts](${SITE}/sponsored/): paid partner posts, labelled
+- [Advertise](${SITE}/advertise/): sponsor the site, weekly email or magazine
+- [Community guidelines](${SITE}/guidelines/)
+
+## Upcoming meets
+${metro.map(m => `- [${m.title}](${SITE}/meets/${m.slug}/): ${fmt(m.starts_at, { weekday: 'short', month: 'short', day: 'numeric' })} ${time(m.starts_at)}, ${m.area || 'Austin area'}${m.entry ? ', ' + m.entry : ''}`).join('\n') || '- New meets go up every night.'}
+${posts.length ? `\n## Magazine stories\n${posts.slice(0, 30).map(p => `- [${p.title}](${SITE}${postUrl(p)})${p.sponsor ? ' (sponsored)' : ''}${p.dek ? ': ' + p.dek : ''}`).join('\n')}\n` : ''}
+## Feeds
+- [Sitemap](${SITE}/sitemap.xml)
+- [Magazine RSS](${SITE}/rss.xml)
+- [Upcoming meets RSS](${SITE}/meets/rss.xml)
+`;
 }
 
 function rss(title, link, desc, items, self) {
@@ -202,25 +265,29 @@ const now = Date.now();
 const upcoming = meets.filter(m => new Date(m.ends_at || new Date(m.starts_at).getTime() + 4 * 36e5).getTime() > now);
 console.log(`meets ${meets.length} (upcoming ${upcoming.length}) · posts ${posts.length} · magazine issues ${(magRaw && magRaw.issues || []).length}`);
 
-for (const d of ['meets', 'news']) { const p = join(ROOT, d); if (existsSync(p)) rmSync(p, { recursive: true, force: true }); }
+const editorial = posts.filter(p => !p.sponsor), sponsoredPosts = posts.filter(p => p.sponsor);
+for (const d of ['meets', 'news', 'sponsored']) { const p = join(ROOT, d); if (existsSync(p)) rmSync(p, { recursive: true, force: true }); }
 put('meets/index.html', meetsIndex(upcoming, cfg));
 for (const m of meets) {
-  const others = upcoming.filter(o => o.id !== m.id).slice(0, 6);
+  const others = upcoming.filter(o => o.id !== m.id && inMetro(o)).slice(0, 6);
   put('meets/' + m.slug + '/index.html', meetPage(m, others, cfg));
 }
 put('meets/missing/index.html', head({ title: 'Meet | PetrolMeets', desc: 'Car meets in Austin.', path: '/meets/', extra: '<meta name="robots" content="noindex">' })
   + `<main class="w" style="padding-top:36px"><h1>Finding that meet…</h1><p class="mute" id="msg">One second.</p><p><a href="/meets/">See every meet</a></p></main>`
   + `<script>(async()=>{const u=(location.pathname.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\\/?$/i)||[])[1];if(u){location.replace('/?meet='+u);return}const k=(location.pathname.match(/-([0-9a-f]{8})\\/?$/)||[])[1];if(!k){document.getElementById('msg').textContent='That meet isn’t on the map any more.';return}try{const r=await fetch('${SB}/rest/v1/rpc/web_meet_key',{method:'POST',headers:{apikey:'${KEY}',Authorization:'Bearer ${KEY}','Content-Type':'application/json'},body:JSON.stringify({p_key:k})});const id=await r.json();if(id&&typeof id==='string'){location.replace('/?meet='+id);return}}catch(e){}document.getElementById('msg').textContent='That meet isn’t on the map any more.'})()</script>` + foot(cfg));
-put('news/index.html', newsIndex(posts, cfg, magRaw, upcoming.filter(m => !m.private && m.status !== 'cancelled').slice(0, 10)));
-posts.forEach((p, i) => put('news/' + p.slug + '/index.html', postPage(p, posts.filter(x => x.slug !== p.slug).slice(0, 4), cfg)));
+put('news/index.html', newsIndex(editorial, cfg, magRaw, upcoming.filter(m => !m.private && m.status !== 'cancelled').slice(0, 10)));
+posts.forEach(p => put(postUrl(p).slice(1) + 'index.html', postPage(p, editorial.filter(x => x.slug !== p.slug).slice(0, 4), cfg)));
+sponsoredPosts.forEach(p => put('news/' + p.slug + '/index.html', moved(postUrl(p))));
+put('sponsored/index.html', sponsoredIndex(sponsoredPosts, cfg));
+put('llms.txt', llms(upcoming, posts));
 
-put('rss.xml', rss('PetrolMeets Magazine', SITE + '/news/', 'Meet recaps, builds, guides and news from the Austin car scene.', posts.slice(0, 30).map(p => ({ title: p.title, link: SITE + '/news/' + p.slug + '/', date: p.published_at, desc: p.dek || '' })), SITE + '/rss.xml'));
+put('rss.xml', rss('PetrolMeets Magazine', SITE + '/news/', 'Meet recaps, builds, guides and news from the Austin car scene.', posts.slice(0, 30).map(p => ({ title: (p.sponsor ? 'Sponsored: ' : '') + p.title, link: SITE + postUrl(p), date: p.published_at, desc: p.dek || '' })), SITE + '/rss.xml'));
 put('meets/rss.xml', rss('PetrolMeets: upcoming Austin car meets', SITE + '/meets/', 'Car meets, cruises and shows around Austin.', upcoming.slice(0, 60).map(m => ({ title: (noticeOf(m) ? NOTICE[noticeOf(m)] + ': ' : '') + m.title + ' · ' + fmt(m.starts_at, { weekday: 'short', month: 'short', day: 'numeric' }), link: SITE + '/meets/' + m.slug + '/', date: m.updated_at || m.starts_at, desc: meetDesc(m) })), SITE + '/meets/rss.xml'));
 
-const urls = [['/', 'daily', '1.0'], ['/meets/', 'hourly', '0.9'], ['/news/', 'daily', '0.8'], ['/advertise/', 'weekly', '0.5'], ['/terms/', 'monthly', '0.2'], ['/privacy/', 'monthly', '0.2'], ['/guidelines/', 'monthly', '0.2']]
+const urls = [['/', 'daily', '1.0'], ['/meets/', 'hourly', '0.9'], ['/news/', 'daily', '0.8'], ['/advertise/', 'weekly', '0.5'], ['/terms/', 'monthly', '0.2'], ['/privacy/', 'monthly', '0.2'], ['/guidelines/', 'monthly', '0.2'], ['/sponsored/', 'weekly', '0.4']]
   .map(([u, f, p]) => `<url><loc>${SITE}${u}</loc><changefreq>${f}</changefreq><priority>${p}</priority></url>`)
   .concat(upcoming.map(m => `<url><loc>${SITE}/meets/${m.slug}/</loc><lastmod>${iso(m.updated_at || m.starts_at)}</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>`))
-  .concat(posts.map(p => `<url><loc>${SITE}/news/${p.slug}/</loc><lastmod>${iso(p.updated_at || p.published_at)}</lastmod><priority>0.6</priority></url>`));
+  .concat(posts.map(p => `<url><loc>${SITE}${postUrl(p)}</loc><lastmod>${iso(p.updated_at || p.published_at)}</lastmod><priority>0.6</priority></url>`));
 put('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join('')}</urlset>`);
 put('robots.txt', `User-agent: *\nAllow: /\nDisallow: /app/\nDisallow: /admin/\nDisallow: /go/\nDisallow: /meets/missing/\n\nSitemap: ${SITE}/sitemap.xml\n`);
 
@@ -229,9 +296,14 @@ const homeFile = join(ROOT, 'index.html');
 if (existsSync(homeFile)) {
   let h = readFileSync(homeFile, 'utf8').replace(/<!--pm-seo-->[\s\S]*?<!--\/pm-seo-->/g, '');
   const desc = 'Car meets, cruises and car shows in Austin, Texas this week. Cars & coffee, JDM, Euro, trucks and more.';
-  const ldSite = { '@context': 'https://schema.org', '@type': 'WebSite', name: 'PetrolMeets', url: SITE + '/' };
-  const tags = `<!--pm-seo--><meta name="description" content="${esc(desc)}"><link rel="canonical" href="${SITE}/"><meta property="og:title" content="PetrolMeets: every car meet in Austin, on one map"><meta property="og:description" content="${esc(desc)}"><meta property="og:image" content="${SITE}/og.png"><meta property="og:url" content="${SITE}/"><meta name="twitter:card" content="summary_large_image"><link rel="alternate" type="application/rss+xml" title="PetrolMeets News" href="${SITE}/rss.xml"><script type="application/ld+json">${JSON.stringify(ldSite)}</script><!--/pm-seo-->`;
-  const body = `<!--pm-seo--><div id="pm-static" style="max-width:860px;margin:0 auto;padding:24px;font-family:system-ui,sans-serif;color:#222"><h1>Every car meet in Austin. One map.</h1><p>${esc(desc)}</p><h2>Coming up</h2><ul>${upcoming.slice(0, 40).map(m => `<li><a href="/meets/${m.slug}/">${esc(m.title)}</a> · ${esc(fmt(m.starts_at, { weekday: 'short', month: 'short', day: 'numeric' }))} ${esc(time(m.starts_at))} · ${esc(m.area || '')}</li>`).join('')}</ul><p><a href="/meets/">All meets</a> · <a href="/news/">News</a> · <a href="/advertise/">Advertise</a></p>${posts.length ? `<h2>News</h2><ul>${posts.slice(0, 6).map(p => `<li><a href="/news/${esc(p.slug)}/">${esc(p.title)}</a></li>`).join('')}</ul>` : ''}</div><!--/pm-seo-->`;
+  const week = upcoming.filter(m => inMetro(m) && m.status !== 'cancelled' && new Date(m.starts_at) < new Date(Date.now() + 7 * 864e5));
+  const ldSite = { '@context': 'https://schema.org', '@graph': [ORG, { '@type': 'WebSite', '@id': SITE + '/#site', name: 'PetrolMeets', url: SITE + '/', publisher: { '@id': SITE + '/#org' } },
+    { '@type': 'ItemList', name: 'Car meets in Austin this week', itemListElement: week.slice(0, 30).map((m, i) => ({ '@type': 'ListItem', position: i + 1, item: { '@type': 'Event', name: m.title, url: SITE + '/meets/' + m.slug + '/', startDate: iso(m.starts_at), endDate: iso(endOf(m)),
+      eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode', eventStatus: 'https://schema.org/EventScheduled', image: [SITE + '/og.png'],
+      location: { '@type': 'Place', name: m.private ? (m.area || 'Austin area') : (m.venue || m.area || 'Austin'), address: m.private ? { '@type': 'PostalAddress', addressLocality: m.area, addressRegion: 'TX', addressCountry: 'US' } : (m.address || (m.area || 'Austin') + ', TX') } } })) }] };
+  const tags = `<!--pm-seo--><meta name="description" content="${esc(desc)}"><link rel="canonical" href="${SITE}/"><meta property="og:title" content="PetrolMeets: every car meet in Austin, on one map"><meta property="og:description" content="${esc(desc)}"><meta property="og:image" content="${SITE}/og.png"><meta property="og:url" content="${SITE}/"><meta name="twitter:card" content="summary_large_image"><link rel="alternate" type="application/rss+xml" title="PetrolMeets News" href="${SITE}/rss.xml"><script type="application/ld+json">${JSON.stringify(ldSite).replace(/</g, '\\u003c')}</script><noscript><style>#__bundler_thumbnail,#__bundler_loading{display:none!important}body{display:block!important}</style></noscript><!--/pm-seo-->`;
+  const body = `<!--pm-seo--><div id="pm-static" style="max-width:860px;margin:0 auto;padding:24px;font-family:system-ui,sans-serif;color:#222"><h1>Every car meet in Austin. One map.</h1><p>${esc(desc)}</p><h2>Coming up</h2><ul>${upcoming.filter(inMetro).slice(0, 40).map(m => `<li><a href="/meets/${m.slug}/">${esc(m.title)}</a> · ${esc(fmt(m.starts_at, { weekday: 'short', month: 'short', day: 'numeric' }))} ${esc(time(m.starts_at))} · ${esc(m.area || '')}</li>`).join('')}</ul><p><a href="/meets/">All meets</a> · <a href="/news/">Magazine</a> · <a href="/sponsored/">Sponsored posts</a> · <a href="/advertise/">Advertise</a></p>${posts.length ? `<h2>Magazine</h2><ul>${posts.slice(0, 6).map(p => `<li><a href="${esc(postUrl(p))}">${esc(p.title)}</a></li>`).join('')}</ul>` : ''}</div><!--/pm-seo-->`;
+  h = h.replace(/\s*<div[^>]*>\s*This page requires JavaScript to display\.\s*<\/div>/i, '');
   h = h.replace(/<head>/i, '<head>' + tags).replace(/<body>/i, '<body>' + body);
   writeFileSync(homeFile, h);
 }

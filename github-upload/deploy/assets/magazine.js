@@ -191,7 +191,7 @@
     el.style.left = box.x + '%'; el.style.top = box.y + '%'; el.style.width = box.w + '%'; el.style.height = box.h + '%';
     if (t === 'post') {
       var p = (ctx.posts || {})[it.post] || null;
-      var title = it.title || (p && p.title) || (ctx.edit ? '[' + (it.post || 'pick a post') + ']' : ''), tag = (p && p.tag) || 'Feature';
+      var title = it.title || (p && p.title) || (ctx.edit ? '[' + (it.post || 'pick a post') + ']' : ''), tag = (p && p.sponsor) ? 'Sponsored' : ((p && p.tag) || 'Feature');
       if (!title) return null;                                   // post not published yet: hide on the public reader
       var dek = it.dek || (p && p.dek) || '';
       el.style.setProperty('--c', TAGC[String(tag).toUpperCase()] || '#E3170A');
@@ -340,11 +340,13 @@
   function article(slug, data, onClose) {
     css(); var p = (data.posts || {})[slug]; if (!p) return null;
     var ov = h('div', 'pmm-ov'); ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', p.title);
-    var u = safeUrl(p.cover_url), when = p.published_at ? new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(p.published_at)) : '';
+    var sp = p.sponsor || null, u = safeUrl(p.cover_url), when = p.published_at ? new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(p.published_at)) : '';
     var card = h('article', 'pmm-art-page', '<button class="x" type="button" aria-label="Close">✕</button><div class="hero"' + (u ? ' style="background-image:url(\'' + u.replace(/'/g, '%27') + '\')"' : '') + '>' + (u ? '' : artBox(p.tag)) + '</div>'
-      + '<div class="in"><span class="pmm-k" style="--c:' + (TAGC[String(p.tag || '').toUpperCase()] || '#E3170A') + ';font-size:13px">' + esc(p.tag || 'Feature') + '</span><h1>' + esc(p.title) + '</h1>' + (p.dek ? '<p class="dek">' + esc(p.dek) + '</p>' : '')
-      + '<p class="by">' + esc(p.author || 'PetrolMeets') + (when ? ' · ' + esc(when) : '') + '</p><div class="body">' + md(p.body_md) + '</div>'
-      + '<div class="foot"><button type="button" class="bk">← Back to the magazine</button><a href="/news/' + esc(slug) + '/">Open as a page</a></div></div>');
+      + '<div class="in"><span class="pmm-k" style="--c:' + (TAGC[String(p.tag || '').toUpperCase()] || '#E3170A') + ';font-size:13px">' + esc(sp ? 'Sponsored' : (p.tag || 'Feature')) + '</span><h1>' + esc(p.title) + '</h1>' + (p.dek ? '<p class="dek">' + esc(p.dek) + '</p>' : '')
+      + (sp ? '<p class="by">SPONSORED · Paid partnership with ' + esc(sp.advertiser || '') + '</p><div class="body">' + md(String(p.body_md || '').replace(/\r/g, '').trim().split(/\n{2,}/).filter(function (b) { return !/^#/.test(b); }).slice(0, 2).join('\n\n')) + '</div>'
+            + '<div class="foot"><button type="button" class="bk">← Back to the magazine</button><a href="/sponsored/' + esc(slug) + '/">Read the full sponsored post →</a></div></div>'
+          : '<p class="by">' + esc(p.author || 'PetrolMeets') + (when ? ' · ' + esc(when) : '') + '</p><div class="body">' + md(p.body_md) + '</div>'
+            + '<div class="foot"><button type="button" class="bk">← Back to the magazine</button><a href="/news/' + esc(slug) + '/">Open as a page</a></div></div>'));
     ov.appendChild(card);
     function close() { ov.remove(); document.removeEventListener('keydown', key); document.documentElement.style.overflow = ''; onClose && onClose(); }
     function key(e) { if (e.key === 'Escape') close(); }
