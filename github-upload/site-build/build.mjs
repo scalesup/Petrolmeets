@@ -35,7 +35,7 @@ const miles = m => { const a = +m.lat, b = +m.lng; if (!Number.isFinite(a) || !N
 const inMetro = m => miles(m) <= METRO_MI;
 const endOf = m => m.ends_at || new Date(new Date(m.starts_at).getTime() + 4 * 36e5).toISOString();
 const ORG = { '@type': 'Organization', '@id': SITE + '/#org', name: 'PetrolMeets', url: SITE + '/', logo: SITE + '/icons/icon-512.png', email: 'info@petrolmeets.com',
-  sameAs: ['https://x.com/PetrolMeets', 'https://www.instagram.com/petrolmeets', 'https://www.tiktok.com/@petrolmeets'] };
+  sameAs: ['https://x.com/PetrolMeets', 'https://www.instagram.com/petrolmeets', 'https://www.tiktok.com/@petrolmeets', 'https://www.facebook.com/profile.php?id=61594763247119'] };
 const postUrl = p => (p.sponsor ? '/sponsored/' : '/news/') + p.slug + '/';
 const freeOf = m => /^free$/i.test(String(m.entry || '').trim()) ? true : /\$\s*\d/.test(String(m.entry || '')) ? false : null;
 
@@ -90,7 +90,7 @@ const head = ({ title, desc, path, image, ld, type = 'website', extra = '', on =
 <meta name="twitter:card" content="summary_large_image"><link rel="icon" href="/icons/icon-192.png"><link rel="alternate" type="application/rss+xml" title="PetrolMeets Magazine" href="${SITE}/rss.xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Yellowtail&display=swap" rel="stylesheet">
 <style>${CSS}</style>${ld ? `<script type="application/ld+json">${JSON.stringify(ld).replace(/</g, '\\u003c')}</script>` : ''}${extra}</head><body>
-<header class="hd"><div class="bar"><a class="logo" href="/"><img src="/assets/pm-emblem.png" alt=""><span class="p">Petrol</span><span class="m">MEETS</span></a><nav><a href="/meets/"${on === 'meets' ? ' class="on"' : ''}>Meets</a><a href="/#map">Map</a><a href="/news/"${on === 'mag' ? ' class="on"' : ''}>Magazine</a><a href="/#join">Promoters</a><a href="/advertise/">Advertise</a></nav>${LOOK}</div></header>`;
+<header class="hd"><div class="bar"><a class="logo" href="/"><img src="/assets/pm-emblem.png" alt=""><span class="p">Petrol</span><span class="m">MEETS</span></a><nav><a href="/meets/"${on === 'meets' ? ' class="on"' : ''}>Meets</a><a href="/#map">Map</a><a href="/news/"${on === 'mag' ? ' class="on"' : ''}>Magazine</a><a href="/#join">Promoters</a><a href="/advertise/"${on === 'adv' ? ' class="on"' : ''}>Advertise</a></nav>${LOOK}</div></header>`;
 const NL_JS = `<script>document.addEventListener('submit',function(e){var f=e.target;if(!f.classList||!f.classList.contains('nl'))return;e.preventDefault();var i=f.querySelector('input'),m=f.querySelector('.nlm'),b=f.querySelector('button'),v=(i.value||'').trim();if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(v)){m.textContent='Add a valid email.';i.focus();return}b.disabled=true;m.textContent='One sec…';fetch('${SB}/functions/v1/newsletter',{method:'POST',headers:{'Content-Type':'application/json',apikey:'${KEY}'},body:JSON.stringify({action:'subscribe',email:v,source:'web-'+(location.pathname.split('/')[1]||'home')})}).then(function(r){return r.json()}).then(function(d){if(d&&d.ok){f.innerHTML='<p style=\\'margin:0;font-weight:700\\'>'+(d.already?'You’re already on the list. See you Thursday.':'Check your inbox and tap the link to confirm.')+'</p>'}else{b.disabled=false;m.textContent='Couldn’t sign you up just now. Try again.'}}).catch(function(){b.disabled=false;m.textContent='Couldn’t sign you up just now. Try again.'})});</script>`;
 const foot = (cfg) => `<footer class="ft"><div class="w"><img src="/assets/pm-emblem.png" alt=""><nav><a href="/meets/">All meets</a><a href="/news/">Magazine</a><a href="/sponsored/">Sponsored</a><a href="/advertise/">Advertise</a><a href="/rss.xml">RSS</a><a href="/terms/">Terms</a><a href="/privacy/">Privacy</a><a href="/guidelines/">Guidelines</a>${cfg.ios ? `<a href="${esc(cfg.ios)}">App Store</a>` : ''}${cfg.android ? `<a href="${esc(cfg.android)}">Google Play</a>` : ''}<a href="mailto:info@petrolmeets.com">info@petrolmeets.com</a></nav>${LOOK}<small>© ${new Date().getFullYear()} PetrolMeets · Austin, Texas</small></div></footer>${THEME_JS}${NL_JS}</body></html>`;
 const getApp = cfg => cfg.app_public && (cfg.ios || cfg.android)
@@ -251,6 +251,64 @@ ${posts.length ? `\n## Magazine stories\n${posts.slice(0, 30).map(p => `- [${p.t
 `;
 }
 
+// /advertise/: self-serve sponsorships (same Blaze v4 light/dark shell as every other page). Logic: site-build/advertise.client.js
+const ADV_CSS = `<style>
+.adv{display:grid;gap:52px;padding-top:36px}.adv h2{margin:0 0 14px}.adv section>p{margin:0 0 16px}
+.adv-banner.ok{background:color-mix(in srgb,#22C55E 16%,var(--card));box-shadow:inset 0 0 0 1.5px #22C55E}.adv-banner.bad{background:color-mix(in srgb,var(--orange) 14%,var(--card));box-shadow:inset 0 0 0 1.5px var(--orange)}.adv-banner{font-weight:600;font-size:16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:12px}.stat{display:grid;gap:6px}.stat b{font-weight:900;font-style:italic;font-stretch:115%;font-size:34px;line-height:1}.stat span{font-size:13px;color:var(--mute)}
+.packs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
+.pack{all:unset;box-sizing:border-box;cursor:pointer;display:grid;gap:10px;align-content:start;padding:clamp(16px,2.6vw,22px);border-radius:16px;background:var(--card);box-shadow:var(--sh);color:var(--ink);transition:transform .15s,box-shadow .15s}
+.pack:hover{transform:translateY(-2px)}.pack:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.pack[aria-checked=true]{box-shadow:inset 0 0 0 2.5px var(--orange),var(--sh)}
+.pack .pt{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:800}.pack .dot{flex:none;width:18px;height:18px;border-radius:50%;box-shadow:inset 0 0 0 2px var(--rule);display:grid;place-items:center}
+.pack[aria-checked=true] .dot{box-shadow:inset 0 0 0 2px var(--orange)}.pack[aria-checked=true] .dot:after{content:"";width:8px;height:8px;border-radius:50%;background:var(--orange)}
+.pack .pp{font-weight:900;font-style:italic;font-stretch:115%;font-size:30px;line-height:1}.pack .per{font-size:14px;font-weight:500;font-style:normal;color:var(--mute)}.pack .pb{font-size:14.5px;line-height:1.5;color:var(--mute)}
+.pn{font-size:11px;font-weight:800;letter-spacing:.16em;color:var(--faint)}.pn.hot,.hot{color:var(--hot)!important}
+.pv-note{font-size:13px;color:var(--faint);margin-top:10px}
+.pv-tick{display:flex;align-items:stretch;height:50px;border-radius:12px;overflow:hidden;background:var(--card);box-shadow:var(--sh)}.pv-tick .l{flex:none;display:flex;align-items:center;padding:0 14px;background:var(--solid);color:var(--on-solid);font-size:10px;font-weight:800;letter-spacing:.18em}
+.pv-tick .r{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:0 16px;font-size:14px;white-space:nowrap;overflow:hidden}.pv-tick .ini{flex:none;width:26px;height:26px;border-radius:7px;background:var(--cyan);color:#15161A;display:grid;place-items:center;font-size:10px;font-weight:900}
+.pv-mail{padding:18px 20px;border-radius:12px;background:#0e0e0d;color:#f3f1ec;display:grid;gap:8px;max-width:520px}.pv-mail .l{font-size:11px;letter-spacing:2px;color:#8a877f}.pv-mail a{color:#ff3131;font-size:14px}
+.pv-post{display:grid;gap:8px;max-width:520px}.pv-mag{position:relative;display:grid;gap:8px;max-width:340px;padding:22px 20px 18px;background:#fff;color:#141414;border:6px solid #141414}
+.pv-mag .tag{position:absolute;top:0;right:0;background:#141414;color:#FFD400;font-weight:900;font-size:10px;letter-spacing:.18em;padding:5px 9px}.pv-mag .ini{width:46px;height:46px;border-radius:50%;background:#141414;color:#FFD400;display:grid;place-items:center;font-weight:900;font-style:italic;font-size:16px}
+.pv-mag .nm{font-weight:900;font-style:italic;font-size:22px;line-height:1;text-transform:uppercase}.pv-mag .go{font-weight:900;font-size:12px;letter-spacing:.12em;color:#E3170A}
+.f{display:grid;gap:16px}.f label{display:grid;gap:6px}.f label>span{display:flex;font-size:14px;font-weight:600;color:var(--ink)}.f label>span small{margin-left:auto;font-size:12px;color:var(--faint);font-weight:600}
+.f input{height:50px;padding:0 14px;border:0;border-radius:12px;background:var(--well);color:var(--ink);font:16px Archivo,system-ui,sans-serif;box-shadow:inset 2px 3px 6px rgba(0,0,0,.1)}.f input::placeholder{color:var(--faint)}
+.f .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:16px}
+.wks{display:flex;gap:6px;flex-wrap:wrap;padding:3px;border-radius:12px;background:var(--track);box-shadow:inset 2px 3px 6px rgba(0,0,0,.14);width:max-content;max-width:100%}
+.wk{height:40px;padding:0 14px;border:0;border-radius:9px;background:none;color:var(--mute);font:800 11px/1 Archivo,system-ui,sans-serif;letter-spacing:.14em;cursor:pointer}.wk[aria-checked=true]{background:var(--cyan);color:#15161A}html[data-theme=han] .wk[aria-checked=true]{background:#FF2E88;box-shadow:0 0 14px rgba(255,46,136,.6)}
+.f ul{margin:0;padding:0 0 0 18px;display:grid;gap:8px;font-size:15px;line-height:1.5;color:var(--mute)}
+.f .tot{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}.f .tot b{font-weight:900;font-style:italic;font-stretch:115%;font-size:30px}
+.f .btn{border:0;cursor:pointer;font-family:inherit;justify-self:start;height:54px;padding:0 24px;font-size:15px}.f .btn:disabled{opacity:.5;cursor:default}
+#f-err{color:var(--hot);font-weight:600}
+</style>`;
+function advertisePage(cfg) {
+  const PK = [['ticker', 'Site ticker', '/week', 9900, 'Your name, a short pitch and a link scrolling across the top of every page of petrolmeets.com.'],
+    ['newsletter', 'Weekly email', '/issue', 14900, 'The sponsor slot in the Thursday email: this weekend’s meets, sent to every subscriber.'],
+    ['post', 'Sponsored post', ' once', 24900, 'A short highlight inside a Magazine story that opens your own full sponsored post page. It stays up for good and gets found on Google.'],
+    ['magazine', 'Magazine Highlight', '/week', 12900, 'A small SPONSORED highlight box on the Magazine’s weekly pages: your name, a short pitch and your link. Not a full page or an article.']];
+  const stat = (k, l) => `<div class="card stat"><span>${l}</span><b data-stat="${k}">—</b></div>`;
+  return head({ title: 'Sponsor PetrolMeets: reach Austin’s car scene', desc: 'Put your shop in front of Austin drivers who open PetrolMeets to find their next car meet. Site ticker, weekly email, Magazine Highlight and sponsored posts, with live visitor numbers.', path: '/advertise/', on: 'adv', extra: ADV_CSS })
+    + `<main class="w adv"><div id="adv-banner" class="notice adv-banner" role="status" hidden></div>`
+    + `<section><div class="k">Sponsors</div><span class="script">Reach Austin’s</span><h1 class="mag" style="text-shadow:var(--hs-c)">CAR SCENE</h1><p class="dek">A spot in front of Austin drivers who open PetrolMeets because they want to find their next car meet. Detailers, tint and wrap shops, parts, tires, food trucks, photographers: this is your crowd.</p><div class="dash"></div></section>`
+    + `<section><h2>Who visits</h2><p class="mute">Car people around Austin checking what’s on this week. <span id="adv-mobile">Most are on a phone.</span></p><div class="stats">${stat('visits_day', 'visits a day on average')}${stat('visits_7d', 'visits in the last 7 days')}${stat('subscribers', 'weekly email subscribers')}${stat('meets_30d', 'meets on the map, next 30 days')}</div><p class="mute" id="adv-asof" style="font-size:13px;margin:12px 0 0">Loading live numbers…</p></section>`
+    + `<section><h2>Pick a spot</h2><div class="packs" role="radiogroup" aria-label="Sponsorship">${PK.map(([k, nm, per, c, b], i) => `<button type="button" class="pack" role="radio" data-pkg="${k}" aria-checked="${i === 0}"><span class="pt"><span class="dot"></span>${esc(nm)}</span><span><span class="pp">$${c / 100}</span><span class="per">${per}</span></span><span class="pb">${esc(b)}</span><span class="pn" hidden></span></button>`).join('')}</div></section>`
+    + `<section><h2>How it looks</h2><p class="mute" id="pv-label">The sponsor ticker, on every page</p>`
+    + `<div data-pv="ticker"><div class="pv-tick"><span class="l">SPONSORS</span><span class="r"><span class="ini" data-v="ini">YS</span><span style="overflow:hidden;text-overflow:ellipsis"><b data-v="name">Your shop</b><span class="mute">: <span data-v="pitch">your pitch</span></span></span></span></div><p class="pv-note">Scrolls across the top of every page, under the menu. Pauses when someone hovers it.</p></div>`
+    + `<div data-pv="newsletter" hidden><div class="pv-mail"><span class="l">THIS WEEK’S SPONSOR</span><span style="font-size:16px;line-height:1.5"><b data-v="name">Your shop</b> · <span data-v="pitch">your pitch</span></span><a>Learn more →</a></div><p class="pv-note">Near the top of the Thursday email, above the week’s meets.</p></div>`
+    + `<div data-pv="post" hidden><div class="card pv-post"><span><span class="spon">SPONSORED</span></span><span class="k" data-v="nameup">YOUR SHOP</span><span style="font-size:21px;font-weight:800;line-height:1.25" data-v="pitch">your pitch</span><a href="/sponsored/" style="font-weight:700">Read the full sponsored post →</a></div><p class="pv-note">A highlight inside a Magazine story opens your own sponsored post page at petrolmeets.com/sponsored/. Featured in one weekly email. Stays up for good.</p></div>`
+    + `<div data-pv="magazine" hidden><div class="pv-mag"><span class="tag">SPONSORED</span><span class="ini" data-v="ini">YS</span><span class="nm" data-v="name">Your shop</span><span style="font-size:14px;font-weight:700;line-height:1.35" data-v="pitch">your pitch</span><span class="go">VISIT →</span></div><p class="pv-note">A highlight box on the pages of the PetrolMeets Magazine, every weekly spread, for as long as you run.</p></div></section>`
+    + `<section><h2>Your sponsorship</h2><form id="adv-form" class="card f" novalidate>`
+    + `<label><span>Business name</span><input id="f-adv" maxlength="60" required autocomplete="organization" placeholder="Hill Country Detail Co."></label>`
+    + `<label><span>Your pitch<small id="f-headn">0 / 60</small></span><input id="f-head" maxlength="60" minlength="4" required placeholder="Ceramic coating from $499 for meet regulars"></label>`
+    + `<div class="two"><label><span>Website or Instagram link</span><input id="f-link" required inputmode="url" autocomplete="url" placeholder="yourshop.com"></label><label><span>Your email (receipt + go-live note)</span><input id="f-email" type="email" required autocomplete="email" placeholder="you@yourshop.com"></label></div>`
+    + `<div id="f-weeks" style="display:grid;gap:8px"><span id="f-weeks-l" style="font-size:14px;font-weight:600">How many weeks</span><div class="wks" role="radiogroup" aria-labelledby="f-weeks-l">${[1, 2, 3, 4].map(w => `<button type="button" class="wk" role="radio" data-w="${w}" aria-checked="${w === 1}">${w} WEEK${w > 1 ? 'S' : ''}</button>`).join('')}</div></div>`
+    + `<ul id="f-terms"></ul><div class="tot"><b id="f-total">$99 · 1 week</b><span class="pn" id="f-sold" hidden></span></div>`
+    + `<button type="submit" class="btn red" id="f-go">Sponsor for $99 →</button><div id="f-err" role="alert" hidden></div>`
+    + `<p class="mute" style="font-size:13px;margin:0">Payment by card through Stripe. Want a bigger package, a meet sponsorship or a map pin? Email <a href="mailto:info@petrolmeets.com?subject=Sponsoring%20PetrolMeets">info@petrolmeets.com</a>. See <a href="/sponsored/">sponsored posts</a> we’ve run.</p></form></section></main>`
+    + `<script>window.PM_SB='${SB}';window.PM_KEY='${KEY}';</script><script>${readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'advertise.client.js'), 'utf8').replace(/<\/script/gi, '<\\/script')}</script>`
+    + foot(cfg);
+}
+
 function rss(title, link, desc, items, self) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>${xml(title)}</title><link>${link}</link><description>${xml(desc)}</description><language>en-us</language><atom:link href="${self}" rel="self" type="application/rss+xml"/>`
     + items.map(i => `<item><title>${xml(i.title)}</title><link>${i.link}</link><guid isPermaLink="true">${i.link}</guid><pubDate>${new Date(i.date).toUTCString()}</pubDate><description>${xml(i.desc || '')}</description></item>`).join('') + `</channel></rss>`;
@@ -280,6 +338,7 @@ posts.forEach(p => put(postUrl(p).slice(1) + 'index.html', postPage(p, editorial
 sponsoredPosts.forEach(p => put('news/' + p.slug + '/index.html', moved(postUrl(p))));
 put('sponsored/index.html', sponsoredIndex(sponsoredPosts, cfg));
 put('llms.txt', llms(upcoming, posts));
+put('advertise/index.html', advertisePage(cfg));
 
 put('rss.xml', rss('PetrolMeets Magazine', SITE + '/news/', 'Meet recaps, builds, guides and news from the Austin car scene.', posts.slice(0, 30).map(p => ({ title: (p.sponsor ? 'Sponsored: ' : '') + p.title, link: SITE + postUrl(p), date: p.published_at, desc: p.dek || '' })), SITE + '/rss.xml'));
 put('meets/rss.xml', rss('PetrolMeets: upcoming Austin car meets', SITE + '/meets/', 'Car meets, cruises and shows around Austin.', upcoming.slice(0, 60).map(m => ({ title: (noticeOf(m) ? NOTICE[noticeOf(m)] + ': ' : '') + m.title + ' · ' + fmt(m.starts_at, { weekday: 'short', month: 'short', day: 'numeric' }), link: SITE + '/meets/' + m.slug + '/', date: m.updated_at || m.starts_at, desc: meetDesc(m) })), SITE + '/meets/rss.xml'));
