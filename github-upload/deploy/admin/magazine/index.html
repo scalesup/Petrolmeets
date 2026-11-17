@@ -65,7 +65,7 @@ var SB_URL = 'https://mgzzwhbagkaevycuzuuz.supabase.co', SB_KEY = 'sb_publishabl
 var sb = window.supabase.createClient(SB_URL, SB_KEY);
 var app = document.getElementById('app'), stEl = document.getElementById('st');
 var S = { all: null, issue: null, sel: 'cover', page: 0, item: null, draft: null, dirty: false, busy: false, posts: [], sponsors: { live: [], price: 12900 }, meets: null };
-var TYPES = { post: 'Story', text: 'Text box', image: 'Photo', meets: 'Meets list', sponsor: 'Sponsor box', signup: 'Email signup', sponsored: 'Sponsored post' };
+var TYPES = { post: 'Story', text: 'Text box', image: 'Photo', meets: 'Meets list', sponsor: 'Sponsor box', signup: 'Email signup', sponsored: 'Sponsored post', spotlight: 'Spotlight', bignum: 'Big number / quote', errata: 'Correction' };
 var L = PMMag.LAYOUTS;
 
 function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -81,6 +81,7 @@ async function load(keep) {
   S.all = d; S.posts = d.posts || [];
   try { var sp = await rpc('web_mag_sponsors'); if (sp) S.sponsors = sp; } catch (e) {}
   try { S.meets = await rpc('mag_meets'); } catch (e) {}
+  try { S.inbox = await rpc('mag_admin_inbox'); } catch (e) { S.inbox = null; }
   if (!keep || !S.issue) S.issue = (d.issues[0] || {}).id || null;
   if (S.issue && !issue()) S.issue = (d.issues[0] || {}).id || null;
   resetDraft(); render();
@@ -137,6 +138,23 @@ function render() {
   var bp = h('input', { type: 'checkbox' }); bp.checked = !!S.all.bot_publish;
   bp.addEventListener('change', async function () { try { await rpc('mag_admin_bot_publish', { p_on: bp.checked }); S.all.bot_publish = bp.checked; toast(bp.checked ? 'Grok can now publish' : 'Grok can only make drafts'); } catch (e) { bp.checked = !bp.checked; toast(errMsg(e), true); } });
   side.appendChild(h('label', { class: 'help', style: 'display:flex;gap:8px;align-items:flex-start' }, [bp, h('span', {}, ['Let Grok publish and change live pages. Off = Grok makes drafts, you publish.'])]));
+  if (S.inbox && (S.inbox.errata.length || S.inbox.edits.length)) {
+    side.appendChild(h('h3', { style: 'margin-top:10px;color:var(--yel)' }, ['From Grok · ' + (S.inbox.errata.length + S.inbox.edits.length)]));
+    S.inbox.errata.forEach(function (e) {
+      side.appendChild(h('div', { class: 'card', style: 'padding:12px;margin:0 0 8px;font-size:13px' }, [h('b', {}, ['Correction · ' + e.issue + ' week ' + e.week]), h('p', { style: 'margin:6px 0' }, [e.text]),
+        h('div', { style: 'display:flex;gap:6px' }, [h('button', { class: 'btn sm ok', on: { click: function () { decide('mag_admin_errata_decide', { p_id: e.id, p_ok: true }, 'Correction added to the live page'); } } }, ['Approve']),
+          h('button', { class: 'btn sm', on: { click: function () { decide('mag_admin_errata_decide', { p_id: e.id, p_ok: false }, 'Correction rejected'); } } }, ['Reject'])])]));
+    });
+    S.inbox.edits.forEach(function (e) {
+      var ch = Object.keys(e.edit || {}).filter(function (k) { return k !== 'body_md' || e.edit.body_md !== e.body_md; });
+      side.appendChild(h('div', { class: 'card', style: 'padding:12px;margin:0 0 8px;font-size:13px' }, [h('b', {}, ['Edit to a live story']), h('p', { style: 'margin:6px 0' }, [e.title]),
+        h('p', { class: 'help', style: 'margin:0 0 6px' }, ['Changes: ' + (ch.join(', ') || 'none')]),
+        e.edit && e.edit.title ? h('p', { style: 'margin:0 0 6px' }, ['New title: ' + e.edit.title]) : null,
+        h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' }, [h('button', { class: 'btn sm ok', on: { click: function () { decide('mag_admin_edit_decide', { p_slug: e.slug, p_ok: true }, 'Story updated on the site') } } }, ['Approve']),
+          h('button', { class: 'btn sm', on: { click: function () { decide('mag_admin_edit_decide', { p_slug: e.slug, p_ok: false }, 'Edit rejected'); } } }, ['Reject']),
+          h('button', { class: 'btn sm', on: { click: function () { var w = window.open('', '_blank'); if (w) { w.document.title = 'Proposed: ' + e.title; w.document.body.innerHTML = '<div style="max-width:720px;margin:30px auto;font:17px/1.6 system-ui">' + PMMag.md((e.edit && e.edit.body_md) || e.body_md) + '</div>'; } } } }, ['Read it'])])]));
+    });
+  }
   side.appendChild(h('p', { class: 'help', html: 'Sponsor boxes: ' + (S.sponsors.live.length ? '<b>' + S.sponsors.live.length + ' live</b>' : 'none live, so they show the “Magazine Highlight” house ad') + '. Approve paid ones in <a href="/admin/">Admin → ADS</a>.' }));
 
   if (!I) { main.appendChild(h('div', { class: 'card help', html: '<b>No issues yet.</b> Pick a month on the left and tap <b>+ Issue</b>. Each issue gets a cover, then you add one spread (two pages) per week.' })); return; }
@@ -157,6 +175,7 @@ function actions(main, label, del) {
   main.appendChild(b);
 }
 
+async function decide(fn, args, msg) { try { await rpc(fn, args); toast(msg); await load(true); } catch (e) { toast(errMsg(e), true); } }
 async function previewLink() {
   var I = issue(); if (!I) return;
   if (S.dirty) toast('Save first: the preview shows what’s saved.', true);
@@ -213,6 +232,7 @@ function coverEditor(main, I) {
       chooser('Headline size', C, 'headline_size', [['', 'Auto (L)'], ['S', 'S'], ['M', 'M'], ['L', 'L'], ['XL', 'XL']], paint),
       chooser('Headline position', C, 'headline_position', [['', 'Bottom'], ['middle', 'Middle'], ['top', 'Top']], paint),
       chooser('Barcode + price strip', C, 'barcode', [['', 'Show'], ['false', 'Hide']], paint),
+      chooser('Issue colors', C, 'theme', [['', 'PetrolMeets (default)'], ['holiday', 'Holiday'], ['midnight', 'Midnight']], paint),
       fld('Photo credit', 'cover_credit', C, 'text', 'Photo: @handle', 'w2')]));
     left.appendChild(jsonBox(C, function () { render(); }));
   }
@@ -237,11 +257,16 @@ function spreadEditor(main, I) {
   [0, 1].forEach(function (pi) {
     var P = D.pages[pi], col = h('div', { class: 'pcol' });
     var lay = h('select', {}, Object.keys(L).map(function (k) { return h('option', { value: k }, [L[k].label]); })); lay.value = P.layout;
-    lay.addEventListener('change', function () { P.layout = lay.value; if (P.layout === 'meets-full' && !P.items.some(function (it) { return it.type === 'meets' && !it.box; })) P.items.unshift({ type: 'meets' }); changed(); render(); });
+    lay.addEventListener('change', function () { P.layout = lay.value;
+      var need = { 'meets-full': 'meets', 'ad-full': 'sponsor', spotlight: 'spotlight', 'big-number': 'bignum' }[P.layout];
+      if (need && !P.items.some(function (it) { return it.type === need && !it.box; })) P.items.unshift(need === 'bignum' ? { type: 'bignum', value: '0', label: 'Label' } : need === 'spotlight' ? { type: 'spotlight', label: 'Spotlight', name: '', facts: [] } : { type: need });
+      changed(); render(); });
     var bg = h('select', {}, [h('option', { value: '' }, ['White']), h('option', { value: 'ink' }, ['Black']), h('option', { value: 'orange' }, ['Orange']), h('option', { value: 'glacier' }, ['Glacier'])]); bg.value = P.bg || '';
     bg.addEventListener('change', function () { if (bg.value) P.bg = bg.value; else delete P.bg; changed(); repaint(); });
     col.appendChild(h('div', { class: 'ph' }, [h('label', { class: 'f' }, [(pi ? 'Right' : 'Left') + ' page · layout', lay]), h('label', { class: 'f', style: 'max-width:130px' }, ['Background', bg])]));
     col.appendChild(txt('Page background photo (optional https:// link, darkened)', 'bg_image', P, 'https://…'));
+    var snp = h('input', { type: 'checkbox' }); snp.checked = P.snap !== false; snp.addEventListener('change', function () { if (snp.checked) delete P.snap; else P.snap = false; changed(); });
+    col.appendChild(h('label', { class: 'free' }, [snp, 'Snap boxes to a grid while dragging']));
     var pv = h('div', { class: 'prev' }); previews[pi] = pv; col.appendChild(pv);
     var slots = (L[P.layout] || L.hero2).slots.length, inSlots = P.items.filter(function (it) { return !it.box; }).length;
     col.appendChild(h('p', { class: 'note' + (P.layout !== 'list' && P.layout !== 'free' && inSlots > slots ? ' warn' : '') }, [
@@ -251,7 +276,7 @@ function spreadEditor(main, I) {
     var list = h('div', { class: 'items' });
     P.items.forEach(function (it, k) { list.appendChild(itemRow(P, it, k, pi)); });
     col.appendChild(list);
-    col.appendChild(h('div', { class: 'adds' }, Object.keys(TYPES).map(function (t) {
+    col.appendChild(h('div', { class: 'adds' }, Object.keys(TYPES).filter(function (t) { return t !== 'errata'; }).map(function (t) {
       return h('button', { class: 'btn sm', disabled: P.items.length >= 12, on: { click: function () { var n = { type: t }; if (t === 'post' || t === 'sponsored') n.post = (S.posts[0] || {}).slug || ''; if (t === 'text') { n.title = 'Editor’s note'; n.body = ''; } if (t === 'sponsor') n.spot = 1; P.items.push(n); S.page = pi; S.item = P.items.length - 1; changed(); render(); } } }, ['+ ' + TYPES[t]]);
     })));
     pages.appendChild(col);
@@ -261,7 +286,7 @@ function spreadEditor(main, I) {
     [0, 1].forEach(function (pi) {
       var pv = previews[pi]; pv.innerHTML = '';
       var wr = weekRange(D);
-      pv.appendChild(PMMag.page(D.pages[pi], { posts: pm, meets: S.meets || sampleMeets(), sponsors: S.sponsors, edit: true, side: pi ? 'right' : 'left', num: pi + 2, run: { title: D.title || 'Week ' + D.week, issue: PMMag.monthTag(I), from: wr.from, to: wr.to },
+      pv.appendChild(PMMag.page(D.pages[pi], { posts: pm, meets: S.meets || sampleMeets(), sponsors: S.sponsors, edit: true, issue: I, theme: ((I && I.cover) || {}).theme, side: pi ? 'right' : 'left', num: pi + 2, run: { title: D.title || 'Week ' + D.week, issue: PMMag.monthTag(I), from: wr.from, to: wr.to },
         selected: S.page === pi ? S.item : null,
         onSelect: function (k) { S.page = pi; S.item = k; render(); },
         onBox: function (k, b) { D.pages[pi].items[k].box = b; changed(); repaint(); } }));
@@ -321,6 +346,19 @@ function itemRow(P, it, k, pi) {
       row.appendChild(h('div', { class: 'fields' }, [h('label', { class: 'f' }, ['From', fd]), h('label', { class: 'f' }, ['To', td]), h('label', { class: 'f' }, ['Areas', ar]), h('label', { class: 'f' }, ['Kinds', kd]), h('label', { class: 'f' }, ['Max meets', lm])]));
     }
   }
+  else if (t === 'spotlight') {
+    row.appendChild(txt('Label', 'label', it, 'Club spotlight')); row.appendChild(txt('Name', 'name', it, 'Night Shift Cars & Slurpees'));
+    row.appendChild(txt('Photo (https:// link)', 'image', it, 'https://…'));
+    var fa = h('textarea', { placeholder: 'One fact per line (up to 4)' }); fa.value = (it.facts || []).join('\n');
+    fa.addEventListener('change', function () { it.facts = fa.value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean).slice(0, 4); changed(); render(); });
+    row.appendChild(h('label', { class: 'f' }, ['Facts', fa])); row.appendChild(txt('Short text (optional)', 'body', it, '', true));
+    row.appendChild(txt('Link (https:// or /path)', 'link', it, 'https://instagram.com/…')); row.appendChild(txt('Button text', 'link_label', it, 'VISIT'));
+  }
+  else if (t === 'bignum') {
+    row.appendChild(txt('Big number (or leave empty and use a quote)', 'value', it, '55')); row.appendChild(txt('Label', 'label', it, 'Meets on the map this month')); row.appendChild(txt('Note', 'note', it));
+    row.appendChild(txt('Quote (instead of a number)', 'quote', it)); row.appendChild(txt('Quote by', 'by', it));
+  }
+  else if (t === 'errata') row.appendChild(txt('Correction text', 'text', it, '', true));
   else if (t === 'signup') { row.appendChild(txt('Heading', 'title', it, 'The weekly')); row.appendChild(txt('Line under it', 'body', it, 'Every meet around Austin, in your inbox every Thursday. Free.')); }
   else if (t === 'sponsor') {
     var sp = h('select', {}, [1, 2, 3, 4, 5].map(function (n) { return h('option', { value: n }, ['Sponsor spot ' + n]); })); sp.value = it.spot || 1;
@@ -331,6 +369,14 @@ function itemRow(P, it, k, pi) {
   var fr = h('input', { type: 'checkbox' }); fr.checked = !!it.box;
   fr.addEventListener('change', function () { if (fr.checked) it.box = slotBox(P, k); else delete it.box; S.page = pi; S.item = k; upd(); render(); });
   row.appendChild(h('label', { class: 'free' }, [fr, 'Place freely (drag on the page)']));
+  if (it.box && sel) {
+    var zz = h('input', { type: 'number', min: 0, max: 20, placeholder: '0' }); zz.value = it.z == null ? '' : it.z;
+    zz.addEventListener('change', function () { var v = parseInt(zz.value, 10); if (v >= 0 && v <= 20) it.z = v; else delete it.z; changed(); render(); });
+    var rr = h('input', { type: 'number', min: -15, max: 15, step: 1, placeholder: '0' }); rr.value = it.rotate || '';
+    rr.addEventListener('change', function () { var v = parseFloat(rr.value); if (v && Math.abs(v) <= 15) it.rotate = v; else delete it.rotate; changed(); render(); });
+    row.appendChild(h('div', { class: 'fields' }, [h('label', { class: 'f' }, ['Layer (higher sits on top)', zz]), h('label', { class: 'f' }, ['Tilt (−15 to 15°)', rr])]));
+  }
+  if (sel && t !== 'post' && t !== 'sponsored') row.appendChild(jsonBox(it));
   return row;
 }
 function slotBox(P, k) {

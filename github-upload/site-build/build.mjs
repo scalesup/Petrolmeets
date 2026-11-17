@@ -233,9 +233,34 @@ function newsIndex(posts, cfg, mag, meetsSoon) {
     + `<p class="mute" style="margin:0 0 8px;font-size:15px">A new issue every month, a new spread every week. Tap a story to read it.</p></div>`
     + `<div id="pm-mag" tabindex="-1"></div>`
     + (has ? '' : `<div id="pm-mag-empty" class="card" style="margin-top:28px;max-width:880px"><b style="font-size:19px">The first issue is on the way.</b><p class="mute" style="margin:6px 0 0"><a href="/#newsletter">Get the weekly</a> and you won’t miss it.</p></div>`)
-    + `<p style="margin:22px 0 0;font-size:14px"><a href="/sponsored/">Sponsored posts from Austin car businesses →</a></p>`
+    + (data.issues.length ? `<p style="margin:22px 0 0;font-size:14px">Every issue: ${data.issues.map(is => `<a href="/news/${esc(is.slug)}/">${esc(issueName(is))}</a>`).join(' · ')}</p>` : '')
+    + `<p style="margin:10px 0 0;font-size:14px"><a href="/sponsored/">Sponsored posts from Austin car businesses →</a></p>`
     + (posts.length ? `<h2 style="margin-top:64px">Every story</h2><div class="dash" style="margin-top:0"></div><div class="grid">${posts.map((p, i) => tile(p, i === 0 && !has)).join('')}</div>` : '')
     + `<div style="margin-top:40px;max-width:880px">${getApp(cfg)}</div></main>` + boot + foot(cfg);
+}
+
+// /news/YYYY-MM/: one crawlable page per issue (CollectionPage + ItemList), a section per week (#week-N)
+const MONTHN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const issueName = is => { const d = new Date(String(is.month || is.slug + '-01') + 'T12:00:00Z'); return MONTHN[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); };
+function issueStories(is, postsBySlug) {
+  const out = [];
+  (is.spreads || []).forEach(s => (s.pages || []).forEach(pg => (pg.items || []).forEach(it => {
+    const t = it.type || 'post'; if ((t === 'post' || t === 'sponsored') && postsBySlug[it.post] && !out.some(o => o.p.slug === it.post)) out.push({ p: postsBySlug[it.post], week: s.week });
+  })));
+  return out;
+}
+function issuePage(is, postsBySlug, cfg) {
+  const path = '/news/' + is.slug + '/', name = issueName(is), stories = issueStories(is, postsBySlug), c = is.cover || {};
+  const ld = { '@context': 'https://schema.org', '@type': 'CollectionPage', name: `PetrolMeets Magazine · ${name}`, url: SITE + path, isPartOf: { '@type': 'Periodical', name: 'PetrolMeets Magazine', url: SITE + '/news/' },
+    mainEntity: { '@type': 'ItemList', itemListElement: stories.map((s, i) => ({ '@type': 'ListItem', position: i + 1, url: SITE + postUrl(s.p), name: s.p.title })) } };
+  const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Magazine', item: SITE + '/news/' }, { '@type': 'ListItem', position: 2, name, item: SITE + path }] };
+  return head({ title: `${name} issue | PetrolMeets Magazine`, desc: (c.headline ? c.headline + '. ' : '') + `Every story in the ${name} issue of the PetrolMeets Magazine: the Austin car scene, week by week.`, path, image: c.cover_image || c.photo_url, ld: [ld, crumbs], on: 'mag' })
+    + `<main class="w" style="padding-top:36px"><a class="k" href="/news/">Magazine · Issue ${String(is.number || 1).padStart(2, '0')}</a><h1>${esc(name)}</h1>`
+    + (c.headline ? `<p class="dek">${esc(c.headline)}${c.sub ? ': ' + esc(c.sub) : ''}</p>` : '')
+    + `<div class="btns"><a class="btn" href="/news/#${esc(is.slug)}">Flip through the issue →</a></div><div class="dash"></div>`
+    + (is.spreads || []).map(s => { const ws = stories.filter(x => x.week === s.week);
+        return `<section id="week-${s.week}"><h2>${esc(s.title || 'Week ' + s.week)}</h2>${ws.length ? `<div class="grid" style="margin-top:0">${ws.map(x => tile(x.p)).join('')}</div>` : '<p class="mute">Meets and the weekly map for this week.</p>'}<p style="margin:10px 0 28px"><a href="/news/#${esc(is.slug)}/w${s.week}">Open week ${s.week} in the magazine →</a></p></section>`; }).join('')
+    + `<div style="margin-top:28px">${getApp(cfg)}</div></main>` + foot(cfg);
 }
 
 // /news/preview/?t=<token>: private draft preview (link from bot_mag_preview or the editor). Never indexed.
@@ -381,6 +406,9 @@ put('sponsored/index.html', sponsoredIndex(sponsoredPosts, cfg));
 put('llms.txt', llms(upcoming, posts));
 put('advertise/index.html', advertisePage(cfg));
 put('news/preview/index.html', magPreview(cfg));
+const magIssues = (magRaw && magRaw.issues) || [], magPosts = {};
+posts.forEach(p => { magPosts[p.slug] = p; });
+magIssues.forEach(is => put('news/' + is.slug + '/index.html', issuePage(is, magPosts, cfg)));
 
 put('rss.xml', rss('PetrolMeets Magazine', SITE + '/news/', 'Meet recaps, builds, guides and news from the Austin car scene.', posts.slice(0, 30).map(p => ({ title: (p.sponsor ? 'Sponsored: ' : '') + p.title, link: SITE + postUrl(p), date: p.published_at, desc: p.dek || '' })), SITE + '/rss.xml'));
 put('meets/rss.xml', rss('PetrolMeets: upcoming Austin car meets', SITE + '/meets/', 'Car meets, cruises and shows around Austin.', upcoming.slice(0, 60).map(m => ({ title: (noticeOf(m) ? NOTICE[noticeOf(m)] + ': ' : '') + m.title + ' · ' + fmt(m.starts_at, { weekday: 'short', month: 'short', day: 'numeric' }), link: SITE + '/meets/' + m.slug + '/', date: m.updated_at || m.starts_at, desc: meetDesc(m) })), SITE + '/meets/rss.xml'));
@@ -388,6 +416,7 @@ put('meets/rss.xml', rss('PetrolMeets: upcoming Austin car meets', SITE + '/meet
 const urls = [['/', 'daily', '1.0'], ['/meets/', 'hourly', '0.9'], ['/news/', 'daily', '0.8'], ['/advertise/', 'weekly', '0.5'], ['/terms/', 'monthly', '0.2'], ['/privacy/', 'monthly', '0.2'], ['/guidelines/', 'monthly', '0.2'], ['/sponsored/', 'weekly', '0.4']]
   .map(([u, f, p]) => `<url><loc>${SITE}${u}</loc><changefreq>${f}</changefreq><priority>${p}</priority></url>`)
   .concat(upcoming.map(m => `<url><loc>${SITE}/meets/${m.slug}/</loc><lastmod>${iso(m.updated_at || m.starts_at)}</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>`))
+  .concat(((magRaw && magRaw.issues) || []).map(is => `<url><loc>${SITE}/news/${is.slug}/</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>`))
   .concat(posts.map(p => `<url><loc>${SITE}${postUrl(p)}</loc><lastmod>${iso(p.updated_at || p.published_at)}</lastmod><priority>0.6</priority></url>`));
 put('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join('')}</urlset>`);
 put('robots.txt', `User-agent: *\nAllow: /\nDisallow: /app/\nDisallow: /admin/\nDisallow: /go/\nDisallow: /meets/missing/\nDisallow: /news/preview/\n\nSitemap: ${SITE}/sitemap.xml\n`);
