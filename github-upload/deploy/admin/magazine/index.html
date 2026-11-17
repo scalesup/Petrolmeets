@@ -237,7 +237,7 @@ function spreadEditor(main, I) {
   [0, 1].forEach(function (pi) {
     var P = D.pages[pi], col = h('div', { class: 'pcol' });
     var lay = h('select', {}, Object.keys(L).map(function (k) { return h('option', { value: k }, [L[k].label]); })); lay.value = P.layout;
-    lay.addEventListener('change', function () { P.layout = lay.value; changed(); render(); });
+    lay.addEventListener('change', function () { P.layout = lay.value; if (P.layout === 'meets-full' && !P.items.some(function (it) { return it.type === 'meets' && !it.box; })) P.items.unshift({ type: 'meets' }); changed(); render(); });
     var bg = h('select', {}, [h('option', { value: '' }, ['White']), h('option', { value: 'ink' }, ['Black']), h('option', { value: 'orange' }, ['Orange']), h('option', { value: 'glacier' }, ['Glacier'])]); bg.value = P.bg || '';
     bg.addEventListener('change', function () { if (bg.value) P.bg = bg.value; else delete P.bg; changed(); repaint(); });
     col.appendChild(h('div', { class: 'ph' }, [h('label', { class: 'f' }, [(pi ? 'Right' : 'Left') + ' page · layout', lay]), h('label', { class: 'f', style: 'max-width:130px' }, ['Background', bg])]));

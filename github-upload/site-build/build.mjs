@@ -77,6 +77,12 @@ ul.list{list-style:none;padding:0;margin:0;display:grid;gap:12px}ul.list a{displ
 .post{font-size:18px;line-height:1.7;color:var(--ink)}.post>p:first-child:first-letter{float:left;font-weight:900;font-style:italic;font-size:4.2em;line-height:.8;padding:.06em .1em 0 0;color:var(--orange)}
 .post img{max-width:100%;border-radius:14px}.post h2,.post h3{color:var(--ink)}.post h3{font-size:22px;font-weight:800;margin:32px 0 8px}
 .post blockquote{margin:28px 0;padding:4px 0 4px 20px;border-left:4px solid var(--orange);font-size:22px;font-weight:700;font-style:italic;line-height:1.4}
+.post figure{margin:28px 0}.post figure img{display:block;width:100%;border-radius:14px}.post figcaption{font-size:14px;color:var(--mute);margin-top:8px}.post figcaption small{color:var(--faint);margin-left:6px}
+.post .gal{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px;margin:28px 0}.post .gal figure{margin:0}.post .gal img{aspect-ratio:4/3;object-fit:cover}
+.post .pull{margin:36px 0;padding:0;border:0;font-weight:900;font-style:italic;font-stretch:115%;font-size:clamp(26px,4vw,36px);line-height:1.1;text-transform:uppercase;color:var(--ink)}.post .pull:before{content:"“";display:block;color:var(--orange);font-size:1.6em;line-height:.6}
+.post .call{margin:28px 0;padding:18px 20px;border-radius:14px;background:var(--card);box-shadow:var(--sh);font-size:17px;line-height:1.55}.post .call b.h{display:block;font-size:11px;font-weight:900;letter-spacing:.18em;color:var(--orange);margin-bottom:6px}.post .call p{margin:0 0 8px}.post .call p:last-child{margin:0}
+.faq{margin:40px 0 0}.faq details{border-top:1px solid var(--rule);padding:14px 0}.faq summary{cursor:pointer;font-weight:800;font-size:18px}.faq details p{margin:8px 0 0;color:var(--mute)}
+.credit{font-size:13px;color:var(--faint);margin:-18px 0 22px}
 .ft{margin-top:72px;border-top:1px solid var(--line)}.ft .w{max-width:1320px;padding:44px clamp(16px,4.5vw,28px) 36px;display:grid;gap:22px;justify-items:center;text-align:center}
 .ft img{height:72px;width:auto}.ft nav{display:flex;gap:10px 22px;flex-wrap:wrap;justify-content:center;font-size:14px}.ft nav a{color:var(--mute)}.ft small{font-size:12.5px;color:var(--faint)}
 .nl{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0}.nl input{flex:1 1 220px;min-width:0;height:48px;padding:0 14px;border:0;border-radius:12px;background:var(--well);color:var(--ink);font:16px Archivo,system-ui,sans-serif;box-shadow:inset 2px 3px 6px rgba(0,0,0,.1)}.nl .btn{border:0;cursor:pointer;font-family:inherit}.nl .nlm{flex-basis:100%;margin:0;font-size:14px}.nl .nlm:empty{display:none}
@@ -98,11 +104,22 @@ const getApp = cfg => cfg.app_public && (cfg.ios || cfg.android)
   : `<div class="card"><span class="script" style="font-size:36px;margin:0 0 4px">The weekly</span><div style="font-weight:900;font-style:italic;font-stretch:118%;font-size:22px;line-height:1.1">THE WEEKEND’S MEETS, BEFORE THE WEEKEND.</div><p class="mute" style="margin:8px 0 0">Free. One email every Thursday. The app for iPhone and Android is coming soon.</p><form class="nl" novalidate><input type="email" name="email" required autocomplete="email" placeholder="you@email.com" aria-label="Your email"><button class="btn" type="submit">Get the weekly →</button><p class="nlm mute" role="status" aria-live="polite"></p></form></div>`;
 
 // ---------- tiny markdown ----------
+// Story markdown: ## headings, lists, **bold**, [links](…), > quotes, plus
+//   ![caption](https://… "Photo: @handle") on its own line = photo with caption; several on consecutive lines = gallery
+//   > [!pull] text = pull quote · > [!tip] / [!note] / [!warning] text = callout box
+const IMG_LINE = /^!\[([^\]]*)\]\((https:\/\/[^)\s"]+)(?:\s+"([^"]*)")?\)$/;
+const fig = (m, lazy = true) => `<figure><img src="${esc(m[2])}" alt="${esc(m[1])}"${lazy ? ' loading="lazy"' : ''}>${m[1] || m[3] ? `<figcaption>${esc(m[1])}${m[3] ? `<small>${esc(m[3])}</small>` : ''}</figcaption>` : ''}</figure>`;
 function md(src, sponsored) {
   const inl = t => esc(t).replace(/!\[([^\]]*)\]\((https:\/\/[^)\s]+)\)/g, '<img src="$2" alt="$1" loading="lazy">')
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+|\/[^)\s]*)\)/g, (m, a, h) => `<a href="${h}"${/^https?:\/\/(?!petrolmeets\.com)/.test(h) ? (sponsored ? ' rel="sponsored noopener"' : ' rel="noopener"') : ''}>${a}</a>`)
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>');
   return String(src || '').replace(/\r/g, '').trim().split(/\n{2,}/).map(b => {
+    const lines = b.trim().split('\n').map(l => l.trim()), imgs = lines.map(l => IMG_LINE.exec(l));
+    if (imgs.every(Boolean)) return imgs.length === 1 ? fig(imgs[0]) : `<div class="gal">${imgs.map(m => fig(m)).join('')}</div>`;
+    const co = /^>\s*\[!(pull|tip|note|warning)\]\s*/i.exec(b);
+    if (co) { const body = b.slice(co[0].length).replace(/^> ?/gm, '').trim(), k = co[1].toLowerCase();
+      if (k === 'pull') return `<blockquote class="pull">${inl(body)}</blockquote>`;
+      return `<aside class="call"><b class="h">${{ tip: 'TIP', note: 'NOTE', warning: 'HEADS UP' }[k]}</b>${body.split(/\n{2,}|\n/).map(x => '<p>' + inl(x) + '</p>').join('')}</aside>`; }
     if (/^### /.test(b)) return '<h3>' + inl(b.slice(4)) + '</h3>';
     if (/^## /.test(b)) return '<h2>' + inl(b.slice(3)) + '</h2>';
     if (/^\s*[-*] /.test(b)) return '<ul>' + b.split('\n').map(l => '<li>' + inl(l.replace(/^\s*[-*] /, '')) + '</li>').join('') + '</ul>';
@@ -163,6 +180,7 @@ const coverStyle = p => p.cover_url && /^https:\/\//.test(p.cover_url) ? ` style
 const tile = (p, lead) => `<a class="tile${lead ? ' lead' : ''}" href="${esc(postUrl(p))}"><div class="ph"${coverStyle(p)}></div><div style="display:grid;gap:10px"><span class="k">${esc(tagOf(p))} · ${esc(fmt(p.published_at, { month: 'short', day: 'numeric' }))}</span><span class="t">${esc(p.title)}</span>${p.dek ? `<span class="d">${esc(p.dek)}</span>` : ''}</div></a>`;
 
 // "## Question?" headings followed by text become FAQPage answers (needs 2+).
+function faqLd(list) { return { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: list.map(x => ({ '@type': 'Question', name: x.q, acceptedAnswer: { '@type': 'Answer', text: x.a } })) }; }
 function faqOf(src) {
   const out = []; let q = null, a = [];
   const flush = () => { if (q && a.length) out.push({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a.join(' ').replace(/[*_>#`]/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/\s+/g, ' ').trim().slice(0, 1200) } }); q = null; a = []; };
@@ -170,23 +188,29 @@ function faqOf(src) {
   flush(); return out.length >= 2 ? { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: out } : null;
 }
 
+let all = [], upcomingAll = [];   // set before story pages are built (related stories, linked meet)
 function postPage(p, recent, cfg) {
   const sp = p.sponsor, path = postUrl(p), title = p.seo_title || p.title, desc = p.seo_desc || p.dek || p.title;
   const ld = { '@context': 'https://schema.org', '@type': 'Article', headline: p.title, description: desc, datePublished: iso(p.published_at), dateModified: iso(p.updated_at || p.published_at),
     author: { '@type': 'Organization', name: p.author || 'PetrolMeets' }, publisher: { '@type': 'Organization', name: 'PetrolMeets', logo: { '@type': 'ImageObject', url: SITE + '/icons/icon-512.png' } },
     mainEntityOfPage: SITE + path, image: [p.cover_url || SITE + '/og.png'], ...(sp ? { sponsor: { '@type': 'Organization', name: sp.advertiser, ...(sp.link ? { url: sp.link } : {}) } } : {}) };
   const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: sp ? 'Sponsored posts' : 'Magazine', item: SITE + (sp ? '/sponsored/' : '/news/') }, { '@type': 'ListItem', position: 2, name: p.title, item: SITE + path }] };
-  const faq = faqOf(p.body_md);
+  const faq = Array.isArray(p.faq) && p.faq.length ? faqLd(p.faq) : faqOf(p.body_md);
+  const byline = p.byline || p.author || 'PetrolMeets', focus = p.cover_focus && p.cover_focus.x != null ? `;object-position:${+p.cover_focus.x}% ${+p.cover_focus.y}%` : '';
+  const rel = (p.related || []).map(s => all.find(x => x.slug === s)).filter(Boolean);
+  const meet = p.meet_slug ? (upcomingAll || []).find(m => m.slug === p.meet_slug) : null;
   return head({ title: title + (sp ? ' | Sponsored | PetrolMeets' : ' | PetrolMeets Magazine'), desc, path, image: p.cover_url, ld: [ld, crumbs, ...(faq ? [faq] : [])], type: 'article', on: 'mag' })
     + `<main class="w" style="padding-top:40px">` + (sp ? `<p style="margin:0 0 12px"><span class="spon">SPONSORED</span> <span class="mute" style="font-size:14px">Paid partnership with ${esc(sp.advertiser)}. <a href="/sponsored/">All sponsored posts</a></span></p>` : '')
-    + `<a href="${sp ? '/sponsored/' : '/news/'}" class="k">${sp ? 'Sponsored post' : 'Magazine · ' + esc(tagOf(p))}</a><h1>${esc(p.title)}</h1>`
+    + `<a href="${sp ? '/sponsored/' : '/news/'}" class="k">${sp ? 'Sponsored post' : 'Magazine · ' + esc(p.kicker || tagOf(p))}</a><h1>${esc(p.title)}</h1>`
     + (p.dek ? `<p class="dek">${esc(p.dek)}</p>` : '')
-    + `<p class="mute" style="font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;margin:12px 0 0">${esc(p.author || 'PetrolMeets')} · ${esc(fmt(p.published_at, { month: 'long', day: 'numeric', year: 'numeric' }))}</p>`
-    + (p.cover_url ? `<img class="cover" src="${esc(p.cover_url)}" alt="">` : '<div class="dash" style="margin:26px 0 30px"></div>')
+    + `<p class="mute" style="font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;margin:12px 0 0">${esc(byline)} · ${esc(fmt(p.published_at, { month: 'long', day: 'numeric', year: 'numeric' }))}${p.read_time ? ' · ' + p.read_time + ' min read' : ''}</p>`
+    + (p.cover_url ? `<img class="cover" src="${esc(p.cover_url)}" alt="${esc(p.cover_alt || '')}" style="${focus}">` + (p.cover_credit ? `<p class="credit">${esc(p.cover_credit)}</p>` : '') : '<div class="dash" style="margin:26px 0 30px"></div>')
     + (sp ? `<p class="mute" style="font-size:14px">This post is paid for by ${sp.link ? `<a href="${esc(sp.link)}" rel="sponsored noopener">${esc(sp.advertiser)}</a>` : esc(sp.advertiser)}. PetrolMeets wrote it with them.</p>` : '')
     + `<article class="post">${md(p.body_md, !!sp)}</article>`
+    + (meet ? `<div class="card" style="margin-top:28px"><span class="k">The meet</span><div style="font-size:20px;font-weight:800;margin:4px 0">${esc(meet.title)}</div><p class="mute" style="margin:0">${esc(fmt(meet.starts_at, { weekday: 'long', month: 'short', day: 'numeric' }))} · ${esc(time(meet.starts_at))} · ${esc(meet.area || 'Austin')}</p><div class="btns"><a class="btn" href="/meets/${esc(meet.slug)}/">Meet details →</a></div></div>` : '')
+    + (Array.isArray(p.faq) && p.faq.length ? `<section class="faq"><h2>Questions</h2>${p.faq.map(x => `<details><summary>${esc(x.q)}</summary><p>${esc(x.a)}</p></details>`).join('')}</section>` : '')
     + (sp && sp.link ? `<div class="btns"><a class="btn" href="${esc(sp.link)}" rel="sponsored noopener">Visit ${esc(sp.advertiser)} →</a></div>` : '')
-    + (recent.length ? `<h2>More from the Magazine</h2><div class="grid" style="margin-top:0">${recent.map(r => tile(r)).join('')}</div>` : '')
+    + ((rel.length || recent.length) ? `<h2>${rel.length ? 'Read next' : 'More from the Magazine'}</h2><div class="grid" style="margin-top:0">${(rel.length ? rel : recent).map(r => tile(r)).join('')}</div>` : '')
     + `<div style="margin-top:36px">${getApp(cfg)}</div></main>` + foot(cfg);
 }
 
@@ -350,6 +374,7 @@ put('meets/missing/index.html', head({ title: 'Meet | PetrolMeets', desc: 'Car m
   + `<main class="w" style="padding-top:36px"><h1>Finding that meet…</h1><p class="mute" id="msg">One second.</p><p><a href="/meets/">See every meet</a></p></main>`
   + `<script>(async()=>{const u=(location.pathname.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\\/?$/i)||[])[1];if(u){location.replace('/?meet='+u);return}const k=(location.pathname.match(/-([0-9a-f]{8})\\/?$/)||[])[1];if(!k){document.getElementById('msg').textContent='That meet isn’t on the map any more.';return}try{const r=await fetch('${SB}/rest/v1/rpc/web_meet_key',{method:'POST',headers:{apikey:'${KEY}',Authorization:'Bearer ${KEY}','Content-Type':'application/json'},body:JSON.stringify({p_key:k})});const id=await r.json();if(id&&typeof id==='string'){location.replace('/?meet='+id);return}}catch(e){}document.getElementById('msg').textContent='That meet isn’t on the map any more.'})()</script>` + foot(cfg));
 put('news/index.html', newsIndex(editorial, cfg, magRaw, upcoming.filter(m => !m.private && m.status !== 'cancelled').slice(0, 10)));
+all = posts; upcomingAll = upcoming;
 posts.forEach(p => put(postUrl(p).slice(1) + 'index.html', postPage(p, editorial.filter(x => x.slug !== p.slug).slice(0, 4), cfg)));
 sponsoredPosts.forEach(p => put('news/' + p.slug + '/index.html', moved(postUrl(p))));
 put('sponsored/index.html', sponsoredIndex(sponsoredPosts, cfg));
