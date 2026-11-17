@@ -195,14 +195,14 @@ function postPage(p, recent, cfg) {
 // spread shows up without waiting for the next site build. Every story still has its own /news/<slug>/ page (listed below the reader).
 function newsIndex(posts, cfg, mag, meetsSoon) {
   const data = { issues: (mag && mag.issues) || [], posts: (mag && mag.posts) || {}, sponsors: (mag && mag.sponsors) || { live: [] },
-    meets: meetsSoon.map(m => ({ title: m.title, starts_at: m.starts_at, area: m.area, slug: m.slug })) };
+    meets: (mag && mag.meets) || meetsSoon.map(m => ({ title: m.title, starts_at: m.starts_at, area: m.area, slug: m.slug, kind: m.kind, status: m.status })) };
   const has = data.issues.length > 0;
   const boot = `<script src="/assets/magazine.js"></script><script>(function(){var D=${JSON.stringify(data).replace(/</g, '\\u003c')};`
     + `var SB='${SB}',K='${KEY}',el=document.getElementById('pm-mag');`
     + `function rpc(f,b){return fetch(SB+'/rest/v1/rpc/'+f,{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'},body:JSON.stringify(b||{})}).then(function(r){return r.ok?r.json():null})}`
     + `var seen={};function ad(id,k){if(!/petrolmeets\\.com$/.test(location.hostname))return;if(k==='view'){if(seen[id])return;seen[id]=1}rpc('web_ad_count',{p_campaign:id,p_kind:k}).catch(function(){})}`
     + `var O={chrome:250,adCount:ad};if(D.issues.length)PMMag.reader(el,D,O);`
-    + `rpc('web_magazine_full').then(function(L){if(!L||!L.issues||!L.issues.length)return;L.meets=D.meets;if(JSON.stringify(L.issues)===JSON.stringify(D.issues)&&JSON.stringify(L.sponsors)===JSON.stringify(D.sponsors))return;D=L;el.innerHTML='';PMMag.reader(el,D,O);document.getElementById('pm-mag-empty')&&document.getElementById('pm-mag-empty').remove()}).catch(function(){})})()</script>`;
+    + `rpc('web_magazine_full').then(function(L){if(!L||!L.issues||!L.issues.length)return;L.meets=L.meets||D.meets;if(JSON.stringify(L.issues)===JSON.stringify(D.issues)&&JSON.stringify(L.sponsors)===JSON.stringify(D.sponsors)&&JSON.stringify(L.meets)===JSON.stringify(D.meets))return;D=L;el.innerHTML='';PMMag.reader(el,D,O);document.getElementById('pm-mag-empty')&&document.getElementById('pm-mag-empty').remove()}).catch(function(){})})()</script>`;
   return head({ title: 'PetrolMeets Magazine: the Austin car scene', desc: 'The Austin car scene, one issue a month and a new spread every week: meet recaps, builds, new spots and guides.', path: '/news/', on: 'mag',
       extra: '<style>.pmm-r{margin-top:18px}</style>' })
     + `<main class="w" style="max-width:1400px;padding-top:18px"><div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 18px"><h1 class="mag" style="font-size:clamp(40px,6vw,68px);margin:0"><span class="script" style="font-size:.62em;margin:0 .2em 0 0">The</span>MAGAZINE</h1>`
@@ -212,6 +212,22 @@ function newsIndex(posts, cfg, mag, meetsSoon) {
     + `<p style="margin:22px 0 0;font-size:14px"><a href="/sponsored/">Sponsored posts from Austin car businesses →</a></p>`
     + (posts.length ? `<h2 style="margin-top:64px">Every story</h2><div class="dash" style="margin-top:0"></div><div class="grid">${posts.map((p, i) => tile(p, i === 0 && !has)).join('')}</div>` : '')
     + `<div style="margin-top:40px;max-width:880px">${getApp(cfg)}</div></main>` + boot + foot(cfg);
+}
+
+// /news/preview/?t=<token>: private draft preview (link from bot_mag_preview or the editor). Never indexed.
+function magPreview(cfg) {
+  const boot = `<script src="/assets/magazine.js"></script><script>(function(){var SB='${SB}',K='${KEY}',el=document.getElementById('pm-mag'),msg=document.getElementById('pv-msg'),t=new URLSearchParams(location.search).get('t')||'';`
+    + `function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}`
+    + `if(!/^[a-f0-9]{20,64}$/.test(t)){msg.textContent='This preview link is not valid.';return}`
+    + `fetch(SB+'/rest/v1/rpc/web_mag_preview',{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'},body:JSON.stringify({p_token:t})}).then(function(r){return r.json()}).then(function(D){`
+    + `if(!D||D.error||!D.issues||!D.issues[0]){msg.textContent=(D&&D.error)||'This preview link has expired. Ask for a new one.';return}`
+    + `var is=D.issues[0],w=[];(is.spreads||[]).forEach(function(s){var st=s.status==='published'?(s.publish_at&&new Date(s.publish_at)>new Date()?'scheduled '+new Date(s.publish_at).toLocaleString('en-US',{timeZone:'America/Chicago',weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'live'):s.status;`
+    + `w.push('<li><b>'+esc(s.title||('Week '+s.week))+'</b> · '+esc(st)+((s.warnings||[]).length?'<ul>'+s.warnings.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>':' · no warnings')+'</li>')});`
+    + `msg.innerHTML='<b>Issue '+esc(is.slug)+' · cover '+esc(is.status)+'</b><ul style="margin:8px 0 0;padding-left:18px">'+w.join('')+'</ul>';`
+    + `PMMag.reader(el,D,{chrome:330})}).catch(function(){msg.textContent='Couldn’t load the preview. Try again.'})})()</script>`;
+  return head({ title: 'Magazine preview | PetrolMeets', desc: 'Private magazine preview.', path: '/news/preview/', on: 'mag',
+      extra: '<meta name="robots" content="noindex,nofollow"><style>.pmm-r{margin-top:18px}#pv-msg ul ul{margin:4px 0 6px;color:var(--hot)}</style>' })
+    + `<main class="w" style="max-width:1400px;padding-top:18px"><div class="notice" style="box-shadow:inset 0 0 0 2px var(--orange)"><span class="spon" style="background:var(--orange);color:#fff">PREVIEW</span> Drafts shown exactly like the live magazine. Not public, and the link expires.<div id="pv-msg" style="margin-top:10px;font-size:14px">Loading the preview…</div></div><div id="pm-mag" tabindex="-1"></div></main>` + boot + foot(cfg);
 }
 
 function sponsoredIndex(list, cfg) {
@@ -339,6 +355,7 @@ sponsoredPosts.forEach(p => put('news/' + p.slug + '/index.html', moved(postUrl(
 put('sponsored/index.html', sponsoredIndex(sponsoredPosts, cfg));
 put('llms.txt', llms(upcoming, posts));
 put('advertise/index.html', advertisePage(cfg));
+put('news/preview/index.html', magPreview(cfg));
 
 put('rss.xml', rss('PetrolMeets Magazine', SITE + '/news/', 'Meet recaps, builds, guides and news from the Austin car scene.', posts.slice(0, 30).map(p => ({ title: (p.sponsor ? 'Sponsored: ' : '') + p.title, link: SITE + postUrl(p), date: p.published_at, desc: p.dek || '' })), SITE + '/rss.xml'));
 put('meets/rss.xml', rss('PetrolMeets: upcoming Austin car meets', SITE + '/meets/', 'Car meets, cruises and shows around Austin.', upcoming.slice(0, 60).map(m => ({ title: (noticeOf(m) ? NOTICE[noticeOf(m)] + ': ' : '') + m.title + ' · ' + fmt(m.starts_at, { weekday: 'short', month: 'short', day: 'numeric' }), link: SITE + '/meets/' + m.slug + '/', date: m.updated_at || m.starts_at, desc: meetDesc(m) })), SITE + '/meets/rss.xml'));
@@ -348,7 +365,7 @@ const urls = [['/', 'daily', '1.0'], ['/meets/', 'hourly', '0.9'], ['/news/', 'd
   .concat(upcoming.map(m => `<url><loc>${SITE}/meets/${m.slug}/</loc><lastmod>${iso(m.updated_at || m.starts_at)}</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>`))
   .concat(posts.map(p => `<url><loc>${SITE}${postUrl(p)}</loc><lastmod>${iso(p.updated_at || p.published_at)}</lastmod><priority>0.6</priority></url>`));
 put('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join('')}</urlset>`);
-put('robots.txt', `User-agent: *\nAllow: /\nDisallow: /app/\nDisallow: /admin/\nDisallow: /go/\nDisallow: /meets/missing/\n\nSitemap: ${SITE}/sitemap.xml\n`);
+put('robots.txt', `User-agent: *\nAllow: /\nDisallow: /app/\nDisallow: /admin/\nDisallow: /go/\nDisallow: /meets/missing/\nDisallow: /news/preview/\n\nSitemap: ${SITE}/sitemap.xml\n`);
 
 // Homepage: real head tags + a plain list of meets/posts for crawlers (the app replaces it when JS runs).
 const homeFile = join(ROOT, 'index.html');

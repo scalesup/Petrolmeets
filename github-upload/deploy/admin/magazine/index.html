@@ -64,8 +64,8 @@ textarea{height:auto;min-height:80px;padding:8px 10px;resize:vertical;line-heigh
 var SB_URL = 'https://mgzzwhbagkaevycuzuuz.supabase.co', SB_KEY = 'sb_publishable_0uVcsppq6UV7Bj7aulIgIw_fai07dgC';
 var sb = window.supabase.createClient(SB_URL, SB_KEY);
 var app = document.getElementById('app'), stEl = document.getElementById('st');
-var S = { all: null, issue: null, sel: 'cover', page: 0, item: null, draft: null, dirty: false, busy: false, posts: [], sponsors: { live: [], price: 12900 } };
-var TYPES = { post: 'Story', text: 'Text box', image: 'Photo', meets: 'Meets list', sponsor: 'Sponsor box' };
+var S = { all: null, issue: null, sel: 'cover', page: 0, item: null, draft: null, dirty: false, busy: false, posts: [], sponsors: { live: [], price: 12900 }, meets: null };
+var TYPES = { post: 'Story', text: 'Text box', image: 'Photo', meets: 'Meets list', sponsor: 'Sponsor box', signup: 'Email signup', sponsored: 'Sponsored post' };
 var L = PMMag.LAYOUTS;
 
 function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -80,6 +80,7 @@ async function load(keep) {
   var d = await rpc('mag_admin_get');
   S.all = d; S.posts = d.posts || [];
   try { var sp = await rpc('web_mag_sponsors'); if (sp) S.sponsors = sp; } catch (e) {}
+  try { S.meets = await rpc('mag_meets'); } catch (e) {}
   if (!keep || !S.issue) S.issue = (d.issues[0] || {}).id || null;
   if (S.issue && !issue()) S.issue = (d.issues[0] || {}).id || null;
   resetDraft(); render();
@@ -136,7 +137,7 @@ function render() {
   var bp = h('input', { type: 'checkbox' }); bp.checked = !!S.all.bot_publish;
   bp.addEventListener('change', async function () { try { await rpc('mag_admin_bot_publish', { p_on: bp.checked }); S.all.bot_publish = bp.checked; toast(bp.checked ? 'Grok can now publish' : 'Grok can only make drafts'); } catch (e) { bp.checked = !bp.checked; toast(errMsg(e), true); } });
   side.appendChild(h('label', { class: 'help', style: 'display:flex;gap:8px;align-items:flex-start' }, [bp, h('span', {}, ['Let Grok publish and change live pages. Off = Grok makes drafts, you publish.'])]));
-  side.appendChild(h('p', { class: 'help', html: 'Sponsor boxes: ' + (S.sponsors.live.length ? '<b>' + S.sponsors.live.length + ' live</b>' : 'none live, so they show “Sponsor this page”') + '. Approve paid ones in <a href="/admin/">Admin → ADS</a>.' }));
+  side.appendChild(h('p', { class: 'help', html: 'Sponsor boxes: ' + (S.sponsors.live.length ? '<b>' + S.sponsors.live.length + ' live</b>' : 'none live, so they show the “Magazine Highlight” house ad') + '. Approve paid ones in <a href="/admin/">Admin → ADS</a>.' }));
 
   if (!I) { main.appendChild(h('div', { class: 'card help', html: '<b>No issues yet.</b> Pick a month on the left and tap <b>+ Issue</b>. Each issue gets a cover, then you add one spread (two pages) per week.' })); return; }
   if (S.sel === 'cover') coverEditor(main, I); else spreadEditor(main, I);
@@ -150,10 +151,32 @@ function actions(main, label, del) {
   var b = h('div', { class: 'bar' }, [h('h2', { style: 'margin:0;font-style:italic;font-weight:900;font-stretch:118%' }, [label]),
     h('span', { class: 'pill' + (live ? ' pub' : '') }, [live ? 'live' : 'draft']), h('span', { class: 'sp' }),
     h('button', { class: 'btn', on: { click: del } }, ['Delete']),
+    h('button', { class: 'btn cy', title: 'A private 7-day link that shows this issue’s drafts exactly like live', on: { click: previewLink } }, ['Preview link']),
     h('button', { class: 'btn ' + (live ? '' : 'ok'), on: { click: function () { save(live ? 'draft' : 'published'); } } }, [live ? 'Unpublish' : 'Save + publish']),
     h('button', { class: 'btn red', disabled: !S.dirty || S.busy, on: { click: function () { save(); } } }, [S.busy ? 'Saving…' : 'Save'])]);
   main.appendChild(b);
 }
+
+async function previewLink() {
+  var I = issue(); if (!I) return;
+  if (S.dirty) toast('Save first: the preview shows what’s saved.', true);
+  try { var r = await rpc('mag_admin_preview', { p_issue: I.slug }); var u = 'https://petrolmeets.com/news/preview/?t=' + r.token + '#' + I.slug + (S.draft && S.draft.kind === 'spread' ? '/w' + S.draft.week : '');
+    try { await navigator.clipboard.writeText(u); toast('Preview link copied. It works for 7 days.'); } catch (e) { toast('Preview link ready'); }
+    window.open(u, '_blank', 'noopener'); } catch (e) { toast(errMsg(e), true); }
+}
+function chooser(lbl, obj, key, opts, after) {
+  var s = h('select', {}, opts.map(function (o) { return h('option', { value: o[0] }, [o[1]]); })); s.value = obj[key] == null ? '' : String(obj[key]);
+  s.addEventListener('change', function () { if (s.value === '') delete obj[key]; else obj[key] = s.value === 'false' ? false : s.value; changed(); (after || render)(); });
+  return h('label', { class: 'f' }, [lbl, s]);
+}
+// Every field Grok can send is editable here too: "Advanced (JSON)" shows the item exactly as the bot API sees it.
+function jsonBox(obj, after) {
+  var ta = h('textarea', { spellcheck: 'false', style: 'font:12px/1.4 ui-monospace,monospace;min-height:110px' }); ta.value = JSON.stringify(obj, null, 1);
+  ta.addEventListener('change', function () { try { var v = JSON.parse(ta.value); Object.keys(obj).forEach(function (k) { delete obj[k]; }); Object.assign(obj, v); changed(); (after || render)(); } catch (e) { toast('That isn’t valid JSON: ' + e.message, true); } });
+  var d = h('details', {}, [h('summary', { style: 'cursor:pointer;font-size:12px;font-weight:800;letter-spacing:.1em' }, ['ADVANCED (JSON)']), ta]);
+  return d;
+}
+function weekRange(D) { return D && D.publish_at ? PMMag.weekOf(D.publish_at) : {}; }
 
 // ---------- cover ----------
 function coverEditor(main, I) {
@@ -175,15 +198,23 @@ function coverEditor(main, I) {
     pos.value = C.photo_pos || '50% 50%'; pos.addEventListener('change', function () { C.photo_pos = pos.value; changed(); paint(); });
     left.appendChild(h('div', { class: 'fields' }, [fld('Hero car photo (https:// link)', 'photo_url', C, 'url', 'https://…', 'w2'), h('label', { class: 'f' }, ['Photo focus', pos]),
       fld('Top line', 'kicker', C, 'text', 'The Austin car scene'), fld('Big headline', 'headline', C, 'text', 'Meet season is on', 'w2'), fld('Under the headline', 'sub', C, 'text', '', 'w2'), fld('Starburst', 'burst', C, 'text', 'Free every week!', 'w2')]));
-    var lw = h('div', { class: 'clines' }, [h('h3', { style: 'margin:4px 0 8px' }, ['Cover lines (up to 6)'])]);
+    var lw = h('div', { class: 'clines' }, [h('h3', { style: 'margin:4px 0 8px' }, ['Cover lines (up to 5; long lines shrink to fit)'])]);
     (C.lines = C.lines || []).forEach(function (ln, k) {
       var tg = h('input', { type: 'text', placeholder: 'Tag (NEW)' }), tx = h('input', { type: 'text', placeholder: 'Cover line' });
       tg.value = ln.tag || ''; tx.value = ln.text || '';
       tg.addEventListener('input', function () { ln.tag = tg.value; changed(); paint(); }); tx.addEventListener('input', function () { ln.text = tx.value; changed(); paint(); });
       lw.appendChild(h('div', { class: 'cln' }, [tg, tx, h('button', { class: 'x btn sm', on: { click: function () { C.lines.splice(k, 1); changed(); render(); } } }, ['✕'])]));
     });
-    if (C.lines.length < 6) lw.appendChild(h('button', { class: 'btn sm', on: { click: function () { C.lines.push({ text: '' }); changed(); render(); } } }, ['+ Cover line']));
+    if (C.lines.length < 5) lw.appendChild(h('button', { class: 'btn sm', on: { click: function () { C.lines.push({ text: '' }); changed(); render(); } } }, ['+ Cover line']));
     left.appendChild(lw);
+    left.appendChild(h('div', { class: 'fields' }, [
+      chooser('Cover lines shown', C, 'max_lines', [['', '4 (default)'], ['2', '2'], ['3', '3'], ['5', '5']], paint),
+      chooser('Cover lines side', C, 'lines_position', [['', 'Left'], ['right', 'Right']], paint),
+      chooser('Headline size', C, 'headline_size', [['', 'Auto (L)'], ['S', 'S'], ['M', 'M'], ['L', 'L'], ['XL', 'XL']], paint),
+      chooser('Headline position', C, 'headline_position', [['', 'Bottom'], ['middle', 'Middle'], ['top', 'Top']], paint),
+      chooser('Barcode + price strip', C, 'barcode', [['', 'Show'], ['false', 'Hide']], paint),
+      fld('Photo credit', 'cover_credit', C, 'text', 'Photo: @handle', 'w2')]));
+    left.appendChild(jsonBox(C, function () { render(); }));
   }
   left.appendChild(h('p', { class: 'help', html: 'The issue goes live on the site when you publish the cover <b>and</b> at least one week. Weeks you leave as drafts stay hidden.' }));
   paint();
@@ -207,9 +238,10 @@ function spreadEditor(main, I) {
     var P = D.pages[pi], col = h('div', { class: 'pcol' });
     var lay = h('select', {}, Object.keys(L).map(function (k) { return h('option', { value: k }, [L[k].label]); })); lay.value = P.layout;
     lay.addEventListener('change', function () { P.layout = lay.value; changed(); render(); });
-    var bg = h('select', {}, [h('option', { value: '' }, ['Paper']), h('option', { value: 'ink' }, ['Black'])]); bg.value = P.bg || '';
+    var bg = h('select', {}, [h('option', { value: '' }, ['White']), h('option', { value: 'ink' }, ['Black']), h('option', { value: 'orange' }, ['Orange']), h('option', { value: 'glacier' }, ['Glacier'])]); bg.value = P.bg || '';
     bg.addEventListener('change', function () { if (bg.value) P.bg = bg.value; else delete P.bg; changed(); repaint(); });
-    col.appendChild(h('div', { class: 'ph' }, [h('label', { class: 'f' }, [(pi ? 'Right' : 'Left') + ' page · layout', lay]), h('label', { class: 'f', style: 'max-width:120px' }, ['Paper', bg])]));
+    col.appendChild(h('div', { class: 'ph' }, [h('label', { class: 'f' }, [(pi ? 'Right' : 'Left') + ' page · layout', lay]), h('label', { class: 'f', style: 'max-width:130px' }, ['Background', bg])]));
+    col.appendChild(txt('Page background photo (optional https:// link, darkened)', 'bg_image', P, 'https://…'));
     var pv = h('div', { class: 'prev' }); previews[pi] = pv; col.appendChild(pv);
     var slots = (L[P.layout] || L.hero2).slots.length, inSlots = P.items.filter(function (it) { return !it.box; }).length;
     col.appendChild(h('p', { class: 'note' + (P.layout !== 'list' && P.layout !== 'free' && inSlots > slots ? ' warn' : '') }, [
@@ -220,7 +252,7 @@ function spreadEditor(main, I) {
     P.items.forEach(function (it, k) { list.appendChild(itemRow(P, it, k, pi)); });
     col.appendChild(list);
     col.appendChild(h('div', { class: 'adds' }, Object.keys(TYPES).map(function (t) {
-      return h('button', { class: 'btn sm', disabled: P.items.length >= 12, on: { click: function () { var n = { type: t }; if (t === 'post') n.post = (S.posts[0] || {}).slug || ''; if (t === 'text') { n.title = 'Editor’s note'; n.body = ''; } if (t === 'sponsor') n.spot = 1; P.items.push(n); S.page = pi; S.item = P.items.length - 1; changed(); render(); } } }, ['+ ' + TYPES[t]]);
+      return h('button', { class: 'btn sm', disabled: P.items.length >= 12, on: { click: function () { var n = { type: t }; if (t === 'post' || t === 'sponsored') n.post = (S.posts[0] || {}).slug || ''; if (t === 'text') { n.title = 'Editor’s note'; n.body = ''; } if (t === 'sponsor') n.spot = 1; P.items.push(n); S.page = pi; S.item = P.items.length - 1; changed(); render(); } } }, ['+ ' + TYPES[t]]);
     })));
     pages.appendChild(col);
   });
@@ -228,7 +260,8 @@ function spreadEditor(main, I) {
     var pm = postMap();
     [0, 1].forEach(function (pi) {
       var pv = previews[pi]; pv.innerHTML = '';
-      pv.appendChild(PMMag.page(D.pages[pi], { posts: pm, meets: sampleMeets(), sponsors: S.sponsors, edit: true, side: pi ? 'right' : 'left', num: pi + 2, run: { title: D.title || 'Week ' + D.week, issue: PMMag.monthTag(I) },
+      var wr = weekRange(D);
+      pv.appendChild(PMMag.page(D.pages[pi], { posts: pm, meets: S.meets || sampleMeets(), sponsors: S.sponsors, edit: true, side: pi ? 'right' : 'left', num: pi + 2, run: { title: D.title || 'Week ' + D.week, issue: PMMag.monthTag(I), from: wr.from, to: wr.to },
         selected: S.page === pi ? S.item : null,
         onSelect: function (k) { S.page = pi; S.item = k; render(); },
         onBox: function (k, b) { D.pages[pi].items[k].box = b; changed(); repaint(); } }));
@@ -244,7 +277,7 @@ function itemRow(P, it, k, pi) {
   var row = h('div', { class: 'it' + (sel ? ' sel' : ''), on: { click: function (e) { if (e.target.closest('input,select,textarea,button')) return; S.page = pi; S.item = k; render(); } } });
   var top = h('div', { class: 'top' }, [h('span', { class: 'ty' }, [TYPES[t]])]);
   function upd() { changed(); }
-  if (t === 'post') {
+  if (t === 'post' || t === 'sponsored') {
     var ps = h('select', {}, S.posts.map(function (p) { return h('option', { value: p.slug }, [(p.status === 'published' ? '' : '[' + p.status.toUpperCase() + '] ') + p.title]); }));
     if (it.post && !S.posts.some(function (p) { return p.slug === it.post; })) ps.appendChild(h('option', { value: it.post }, ['(missing) ' + it.post]));
     ps.value = it.post || ''; ps.addEventListener('change', function () { it.post = ps.value; upd(); render(); });
@@ -255,22 +288,45 @@ function itemRow(P, it, k, pi) {
   top.appendChild(h('button', { class: 'x', title: 'Move to the other page', on: { click: function () { var o = S.draft.pages[1 - pi]; if (o.items.length >= 12) return toast('That page is full', true); o.items.push(P.items.splice(k, 1)[0]); S.page = 1 - pi; S.item = o.items.length - 1; upd(); render(); } } }, [pi ? '←' : '→']));
   top.appendChild(h('button', { class: 'x', title: 'Remove', on: { click: function () { P.items.splice(k, 1); S.item = null; upd(); render(); } } }, ['✕']));
   row.appendChild(top);
-  if (t === 'post') {
+  if (t === 'post' || t === 'sponsored') {
     var p = postMap()[it.post];
     if (p && p.status !== 'published') row.appendChild(h('div', { class: 'note warn' }, ['This story is a ' + p.status + '. It won’t show on the live magazine until you publish it in the Newsroom.']));
     if (sel) {
-      row.appendChild(txt('Headline on this page (optional)', 'title', it, p ? p.title : ''));
+      if (it.title && !it.display_title) { it.display_title = it.title; delete it.title; }
+      row.appendChild(txt('Short headline for this page (optional; the story page keeps its full title)', 'display_title', it, p ? p.title : ''));
       row.appendChild(txt('Summary on this page (optional)', 'dek', it, p ? (p.dek || '') : ''));
       row.appendChild(txt('Photo on this page (optional https:// link)', 'image', it, p ? (p.cover_url || '') : ''));
+      row.appendChild(h('div', { class: 'fields' }, [
+        chooser('Headline size', it, 'title_size', [['', 'Auto'], ['S', 'S'], ['M', 'M'], ['L', 'L'], ['XL', 'XL']]),
+        chooser('Look', it, 'theme', [['', 'Default'], ['ink', 'Black'], ['orange', 'Orange'], ['glacier', 'Glacier'], ['photo', 'Full photo']]),
+        chooser('Align', it, 'align', [['', 'Left'], ['center', 'Center'], ['right', 'Right']]),
+        chooser('Summary', it, 'dek', [['', 'Show'], ['false', 'Hide']])]));
+      row.appendChild(jsonBox(it));
     }
   } else if (t === 'text') { row.appendChild(txt('Title', 'title', it)); row.appendChild(txt('Text (**bold**, [link](https://…))', 'body', it, '', true)); }
   else if (t === 'image') { row.appendChild(txt('Photo (https:// link)', 'image', it)); row.appendChild(txt('Caption', 'caption', it)); }
-  else if (t === 'meets') row.appendChild(txt('Heading', 'title', it, 'This weekend'));
+  else if (t === 'meets') {
+    row.appendChild(txt('Heading', 'title', it, 'This week'));
+    if (sel) {
+      var wr = weekRange(S.draft);
+      row.appendChild(h('div', { class: 'note' }, [wr.from ? 'Shows meets for ' + wr.from + ' to ' + wr.to + ' (this week’s release date). Set dates below to change it.' : 'Set “Release on” above and this shows that week’s meets. Until then it shows what’s coming up.']));
+      var fd = h('input', { type: 'date' }), td = h('input', { type: 'date' }); fd.value = it.from || ''; td.value = it.to || '';
+      fd.addEventListener('change', function () { if (fd.value) it.from = fd.value; else delete it.from; changed(); render(); }); td.addEventListener('change', function () { if (td.value) it.to = td.value; else delete it.to; changed(); render(); });
+      var ar = h('input', { type: 'text', placeholder: 'Austin, Georgetown' }); ar.value = (it.areas || []).join(', ');
+      ar.addEventListener('change', function () { var v = ar.value.split(',').map(function (s) { return s.trim(); }).filter(Boolean); if (v.length) it.areas = v; else delete it.areas; changed(); render(); });
+      var lm = h('input', { type: 'number', min: 1, max: 30, placeholder: 'all' }); lm.value = it.limit || '';
+      lm.addEventListener('change', function () { var v = parseInt(lm.value, 10); if (v > 0) it.limit = v; else delete it.limit; changed(); render(); });
+      var kd = h('select', {}, [['', 'All kinds'], ['meet', 'Meets'], ['drive', 'Drives / cruises'], ['event', 'Shows / events']].map(function (o) { return h('option', { value: o[0] }, [o[1]]); })); kd.value = (it.kinds || [])[0] || '';
+      kd.addEventListener('change', function () { if (kd.value) it.kinds = [kd.value]; else delete it.kinds; changed(); render(); });
+      row.appendChild(h('div', { class: 'fields' }, [h('label', { class: 'f' }, ['From', fd]), h('label', { class: 'f' }, ['To', td]), h('label', { class: 'f' }, ['Areas', ar]), h('label', { class: 'f' }, ['Kinds', kd]), h('label', { class: 'f' }, ['Max meets', lm])]));
+    }
+  }
+  else if (t === 'signup') { row.appendChild(txt('Heading', 'title', it, 'The weekly')); row.appendChild(txt('Line under it', 'body', it, 'Every meet around Austin, in your inbox every Thursday. Free.')); }
   else if (t === 'sponsor') {
     var sp = h('select', {}, [1, 2, 3, 4, 5].map(function (n) { return h('option', { value: n }, ['Sponsor spot ' + n]); })); sp.value = it.spot || 1;
     sp.addEventListener('change', function () { it.spot = parseInt(sp.value, 10); upd(); render(); });
     row.appendChild(h('label', { class: 'f' }, ['Which paid sponsor', sp]));
-    row.appendChild(h('div', { class: 'note' }, [S.sponsors.live.length ? 'Shows live sponsor #' + (((it.spot || 1) - 1) % S.sponsors.live.length + 1) + ' of ' + S.sponsors.live.length + '.' : 'No paid sponsor is live, so this shows “Sponsor this page” with a link to buy the spot.']));
+    row.appendChild(h('div', { class: 'note' }, [S.sponsors.live.length ? 'Shows live sponsor #' + (((it.spot || 1) - 1) % S.sponsors.live.length + 1) + ' of ' + S.sponsors.live.length + '.' : 'No paid sponsor is live, so this shows the “Magazine Highlight” house ad with a link to buy the spot.']));
   }
   var fr = h('input', { type: 'checkbox' }); fr.checked = !!it.box;
   fr.addEventListener('change', function () { if (fr.checked) it.box = slotBox(P, k); else delete it.box; S.page = pi; S.item = k; upd(); render(); });
@@ -333,7 +389,7 @@ function preview() {
   if (S.draft && S.draft.kind === 'spread') I.spreads = I.spreads.map(function (s) { return s.id === S.draft.id ? Object.assign({}, s, { pages: S.draft.pages, title: S.draft.title, week: S.draft.week }) : s; });
   var m = h('div', { class: 'modal' }), box = h('div', {}), x = h('button', { class: 'btn red close', on: { click: function () { m.remove(); } } }, ['Close preview']);
   m.appendChild(x); m.appendChild(h('p', { class: 'help', style: 'text-align:center;margin:6px 0 14px' }, ['Preview, drafts included. Visitors only see published weeks.'])); m.appendChild(box); document.body.appendChild(m);
-  PMMag.reader(box, { issues: [I], posts: postMap(), meets: sampleMeets(), sponsors: S.sponsors }, { noHash: true, chrome: 120 });
+  PMMag.reader(box, { issues: [I], posts: postMap(), meets: S.meets || sampleMeets(), sponsors: S.sponsors }, { noHash: true, chrome: 120 });
 }
 addEventListener('beforeunload', function (e) { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } });
 
