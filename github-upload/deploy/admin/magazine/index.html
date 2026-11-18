@@ -45,6 +45,7 @@ textarea{height:auto;min-height:80px;padding:8px 10px;resize:vertical;line-heigh
 .adds{display:flex;flex-wrap:wrap;gap:6px}
 .note{font-size:12.5px;color:var(--mute)}.warn{color:var(--yel)}.err{color:#FF8A8A}
 .clines .cln{display:grid;grid-template-columns:110px 1fr 30px;gap:6px;margin-bottom:6px}
+.clines .cln.nm{grid-template-columns:80px 1fr 1fr 1.4fr 30px}@media(max-width:700px){.clines .cln.nm{grid-template-columns:1fr 1fr}}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#111;border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-weight:700;z-index:100;box-shadow:0 10px 30px rgba(0,0,0,.6)}
 .gate{max-width:520px;margin:12vh auto;text-align:center;padding:24px}
 .modal{position:fixed;inset:0;z-index:200;background:#0E0E0D;overflow:auto;padding:16px 0}
@@ -215,25 +216,41 @@ function coverEditor(main, I) {
   } else {
     var pos = h('select', {}, ['50% 50%', '50% 20%', '50% 80%', '30% 50%', '70% 50%'].map(function (v, k) { return h('option', { value: v }, [['Center', 'Top', 'Bottom', 'Left', 'Right'][k]]); }));
     pos.value = C.photo_pos || '50% 50%'; pos.addEventListener('change', function () { C.photo_pos = pos.value; changed(); paint(); });
-    left.appendChild(h('div', { class: 'fields' }, [fld('Hero car photo (https:// link)', 'photo_url', C, 'url', 'https://…', 'w2'), h('label', { class: 'f' }, ['Photo focus', pos]),
-      fld('Top line', 'kicker', C, 'text', 'The Austin car scene'), fld('Big headline', 'headline', C, 'text', 'Meet season is on', 'w2'), fld('Under the headline', 'sub', C, 'text', '', 'w2'), fld('Starburst', 'burst', C, 'text', 'Free every week!', 'w2')]));
-    var lw = h('div', { class: 'clines' }, [h('h3', { style: 'margin:4px 0 8px' }, ['Cover lines (up to 5; long lines shrink to fit)'])]);
+    var NM = C.style === 'nightmeet', maxL = NM ? 4 : 5;
+    function lst(lbl, key, ph, cls) { var i = h('input', { type: 'text', placeholder: ph || '' }); i.value = Array.isArray(C[key]) ? C[key].join(', ') : '';
+      i.addEventListener('input', function () { var a = i.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean); if (a.length) C[key] = a; else delete C[key]; changed(); paint(); });
+      return h('label', { class: 'f' + (cls ? ' ' + cls : '') }, [lbl, i]); }
+    function pfld(lbl, k, ph) { var i = h('input', { type: 'text', placeholder: ph }); i.value = (C.promo || {})[k] || '';
+      i.addEventListener('input', function () { C.promo = C.promo || {}; if (i.value) C.promo[k] = i.value; else delete C.promo[k]; changed(); paint(); }); return h('label', { class: 'f w2' }, [lbl, i]); }
+    left.appendChild(h('div', { class: 'fields' }, [chooser('Cover style', C, 'style', [['', 'Classic'], ['nightmeet', 'Night meet (four corners)']]),
+      fld('Hero car photo (https:// link)', 'photo_url', C, 'url', 'https://…', 'w2'), h('label', { class: 'f' }, ['Photo focus', pos])].concat(NM ? [
+      fld('Edition pill', 'edition', C, 'text', 'First Issue'), lst('Top rail words (commas)', 'rail', 'CAR MEETS, SHOWS, CRUISES, BUILDS', 'w2'),
+      fld('Big headline, line 1 (white)', 'headline', C, 'text', 'Meet season', 'w2'), fld('Big headline, line 2 (orange)', 'headline2', C, 'text', 'is on', 'w2'),
+      fld('Tagline', 'tagline', C, 'text', 'DRIVE • DISCOVER • MEET', 'w2'), lst('Side rail words (commas)', 'side', 'CAR MEETS, CRUISES, SHOWS, AUSTIN TX', 'w2'),
+      pfld('Promo box title', 'title', 'Every meet. One map.'), pfld('Promo box line', 'text', "This week's car meets, free at petrolmeets.com."),
+      lst('PLUS list (commas, up to 5)', 'plus', 'Meet guide, Phone photo tips, And more', 'w2')] : [
+      fld('Top line', 'kicker', C, 'text', 'The Austin car scene'), fld('Big headline', 'headline', C, 'text', 'Meet season is on', 'w2'), fld('Under the headline', 'sub', C, 'text', '', 'w2'), fld('Starburst', 'burst', C, 'text', 'Free every week!', 'w2')])));
+    var lw = h('div', { class: 'clines' }, [h('h3', { style: 'margin:4px 0 8px' }, [NM ? 'Corner cover lines (top-left, top-right, lower-left, lower-right)' : 'Cover lines (up to 5; long lines shrink to fit)'])]);
     (C.lines = C.lines || []).forEach(function (ln, k) {
-      var tg = h('input', { type: 'text', placeholder: 'Tag (NEW)' }), tx = h('input', { type: 'text', placeholder: 'Cover line' });
+      var tg = h('input', { type: 'text', placeholder: 'Tag (NEW)' }), tx = h('input', { type: 'text', placeholder: NM ? 'Line 1 (white)' : 'Cover line' });
       tg.value = ln.tag || ''; tx.value = ln.text || '';
       tg.addEventListener('input', function () { ln.tag = tg.value; changed(); paint(); }); tx.addEventListener('input', function () { ln.text = tx.value; changed(); paint(); });
-      lw.appendChild(h('div', { class: 'cln' }, [tg, tx, h('button', { class: 'x btn sm', on: { click: function () { C.lines.splice(k, 1); changed(); render(); } } }, ['✕'])]));
+      var row = [tg, tx];
+      if (NM) ['text2', 'sub'].forEach(function (key) { var i = h('input', { type: 'text', placeholder: key === 'text2' ? 'Line 2 (orange)' : 'Small line' }); i.value = ln[key] || '';
+        i.addEventListener('input', function () { if (i.value) ln[key] = i.value; else delete ln[key]; changed(); paint(); }); row.push(i); });
+      row.push(h('button', { class: 'x btn sm', on: { click: function () { C.lines.splice(k, 1); changed(); render(); } } }, ['✕']));
+      lw.appendChild(h('div', { class: 'cln' + (NM ? ' nm' : '') }, row));
     });
-    if (C.lines.length < 5) lw.appendChild(h('button', { class: 'btn sm', on: { click: function () { C.lines.push({ text: '' }); changed(); render(); } } }, ['+ Cover line']));
+    if (C.lines.length < maxL) lw.appendChild(h('button', { class: 'btn sm', on: { click: function () { C.lines.push({ text: '' }); changed(); render(); } } }, ['+ Cover line']));
     left.appendChild(lw);
-    left.appendChild(h('div', { class: 'fields' }, [
+    left.appendChild(h('div', { class: 'fields' }, (NM ? [] : [
       chooser('Cover lines shown', C, 'max_lines', [['', '4 (default)'], ['2', '2'], ['3', '3'], ['5', '5']], paint),
       chooser('Cover lines side', C, 'lines_position', [['', 'Left'], ['right', 'Right']], paint),
       chooser('Headline size', C, 'headline_size', [['', 'Auto (L)'], ['S', 'S'], ['M', 'M'], ['L', 'L'], ['XL', 'XL']], paint),
-      chooser('Headline position', C, 'headline_position', [['', 'Bottom'], ['middle', 'Middle'], ['top', 'Top']], paint),
+      chooser('Headline position', C, 'headline_position', [['', 'Bottom'], ['middle', 'Middle'], ['top', 'Top']], paint)]).concat([
       chooser('Barcode + price strip', C, 'barcode', [['', 'Show'], ['false', 'Hide']], paint),
       chooser('Issue colors', C, 'theme', [['', 'PetrolMeets (default)'], ['holiday', 'Holiday'], ['midnight', 'Midnight']], paint),
-      fld('Photo credit', 'cover_credit', C, 'text', 'Photo: @handle', 'w2')]));
+      fld('Photo credit', 'cover_credit', C, 'text', 'Photo: @handle', 'w2')])));
     left.appendChild(jsonBox(C, function () { render(); }));
   }
   left.appendChild(h('p', { class: 'help', html: 'The issue goes live on the site when you publish the cover <b>and</b> at least one week. Weeks you leave as drafts stay hidden.' }));
