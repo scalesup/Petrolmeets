@@ -160,7 +160,7 @@ function meetPage(m, others, cfg) {
     + (n ? `<div class="notice" role="status"><b>${esc(NOTICE[n])}</b>${m.notice_note ? `<div style="margin-top:4px">${esc(m.notice_note)}</div>` : ''}</div>` : '')
     + (ended ? `<div class="notice"><b>This meet has ended</b><div style="margin-top:4px">See what’s on next below.</div></div>` : '')
     + `<div class="card"><dl class="row"><dt>When</dt><dd><b>${esc(day(m.starts_at))}</b><br>${esc(time(m.starts_at))}${m.ends_at ? ' – ' + esc(time(m.ends_at)) : ''} Central</dd>`
-    + `<dt>Where</dt><dd>${m.private ? `${esc(m.area || 'Austin area')}<br><span class="mute">Private meet: the host shares the spot with approved guests.</span>` : `<b>${esc(m.venue || '')}</b>${m.address ? '<br>' + esc(m.address) : ''}`}</dd>`
+    + `<dt>Where</dt><dd>${m.private ? `${esc(m.area || 'Austin area')}<br><span class="mute">Private meet: the host shares the spot with approved guests.</span>` : (m.venue && m.venue !== m.address ? `<b>${esc(m.venue)}</b>${m.address ? '<br>' + esc(m.address) : ''}` : `<b>${esc(m.address || m.venue || '')}</b>`)}</dd>`
     + (m.scenes?.length ? `<dt>Scene</dt><dd>${esc(m.scenes.join(' · '))}</dd>` : '')
     + (m.entry ? `<dt>Entry</dt><dd>${esc(m.entry)}</dd>` : '')
     + (m.org ? `<dt>Host</dt><dd>${esc(m.org.name || '')}${m.org.handle ? ` <a href="https://instagram.com/${esc(String(m.org.handle).replace(/^@/, ''))}" rel="noopener">@${esc(String(m.org.handle).replace(/^@/, ''))}</a>` : ''}</dd>` : '')
