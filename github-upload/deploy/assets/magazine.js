@@ -204,6 +204,7 @@
 .pmm-bar{position:relative;z-index:10;width:100%;max-width:1320px;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px}\
 .pmm-bar select{width:auto}.pmm-bar select,.pmm-bar button{height:40px;border:0;border-radius:10px;padding:0 14px;font:800 12px/1 Archivo,system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;background:var(--card,#fff);color:var(--ink,#0C0C0A);box-shadow:0 1px 0 var(--hi,#fff) inset,3px 6px 14px -8px rgba(0,0,0,.4)}\
 .pmm-bar button[aria-current=true]{background:var(--pmo,#F15419);color:#fff}\
+@media (pointer:coarse){.pmm-bar select,.pmm-bar button{height:44px}.pmm-bar select{font-size:16px;letter-spacing:.04em}}\
 .pmm-bar .chips{display:flex;gap:6px;overflow-x:auto;max-width:100%;scrollbar-width:none;padding:2px}\
 .pmm-desk{position:relative;display:flex;align-items:center;justify-content:center;gap:10px;width:100%}\
 .pmm-arrow{flex:none;width:46px;height:46px;border-radius:50%;border:0;background:var(--card,#fff);color:var(--ink,#0C0C0A);font-size:22px;font-weight:900;cursor:pointer;box-shadow:3px 6px 14px -6px rgba(0,0,0,.45)}.pmm-arrow:disabled{opacity:.3;cursor:default}\
