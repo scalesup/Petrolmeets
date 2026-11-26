@@ -1,3 +1,16 @@
+# Security headers on every page (Nov 26 audit): no framing by other sites (clickjacking), no MIME sniffing,
+# no full URLs leaked to other sites, and only the browser features the app uses.
+/*
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self' https://checkout.stripe.com
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(self), microphone=(), geolocation=(self), payment=(), usb=(), interest-cohort=()
+  Strict-Transport-Security: max-age=31536000
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
+/admin/*
+  X-Robots-Tag: noindex, nofollow
+  Cache-Control: no-store
 /sw.js
   Cache-Control: no-cache
 /manifest.webmanifest
